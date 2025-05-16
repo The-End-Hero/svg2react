@@ -73,14 +73,14 @@ const formatSvg = (svgString: string): string => {
   let content = svgElement.innerHTML;
   
   // 处理自闭合标签
-  content = content.replace(/<([^>]+)\/>/g, (match, tag) => {
+  content = content.replace(/<([^>]+)\/>/g, (_, tag) => {
     return `<${tag}></${tag.split(" ")[0]}>`;
   });
 
   // 添加适当的缩进和换行
   content = content
     .replace(/>\s+</g, "><") // 移除标签之间的空白
-    .replace(/<([^>]+)>/g, (match, tag) => {
+    .replace(/<([^>]+)>/g, (_, tag) => {
       // 为每个标签添加缩进
       return `  <${tag}>`;
     });
@@ -142,7 +142,7 @@ export default function SvgConverter() {
       // 处理内部元素的属性名
       content = content.replace(
         /([a-z-]+)=/g,
-        (match: string, attr: string) => {
+        (_, attr: string) => {
           const reactAttrName = attr.replace(
             /-([a-z])/g,
             (_: string, letter: string) => letter.toUpperCase(),
@@ -225,7 +225,7 @@ export default ${name};`;
     }
   }, []);
 
-  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+  const { getRootProps, isDragActive } = useDropzone({
     onDrop,
     accept: {
       "image/svg+xml": [".svg"],
