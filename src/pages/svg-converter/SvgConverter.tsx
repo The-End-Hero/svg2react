@@ -8,7 +8,7 @@ type FileType = "tsx" | "jsx";
 
 const CodeBlock = ({ code, language }: { code: string; language: string }) => {
   return (
-    <div className="relative w-full overflow-x-auto">
+    <div className="relative w-full overflow-x-auto scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-gray-800 hover:scrollbar-thumb-gray-500">
       <div className="min-w-full inline-block">
         <Highlight theme={themes.nightOwl} code={code.trim()} language={language}>
           {({ className, style, tokens, getLineProps, getTokenProps }) => (
