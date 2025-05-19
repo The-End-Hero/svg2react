@@ -1,4 +1,5 @@
 @import 'tailwindcss';
+@plugin 'tailwind-scrollbar';
 
 /*
   The default border color has changed to `currentcolor` in Tailwind CSS v4,

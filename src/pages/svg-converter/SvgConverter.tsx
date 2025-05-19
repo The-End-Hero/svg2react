@@ -18,7 +18,7 @@ const CodeBlock = ({ code, language }: { code: string; language: string }) => {
                   <span className="table-cell text-right pr-4 select-none text-gray-500 w-8">
                     {i + 1}
                   </span>
-                  <span className="table-cell whitespace-pre">
+                  <span className="table-cell whitespace-pre-wrap break-words max-w-[800px]">
                     {line.map((token, key) => (
                       <span key={key} {...getTokenProps({ token })} />
                     ))}
