@@ -301,9 +301,9 @@ export default ${name};`;
         )}
 
         {error && (
-          <div className="bg-red-900/50 border-l-4 border-red-400 p-3 rounded-r-lg flex-shrink-0">
+          <div className="bg-red-900/50 border-l-4 border-red-400 p-3 rounded-r-lg shrink-0">
             <div className="flex">
-              <div className="flex-shrink-0">
+              <div className="shrink-0">
                 <svg
                   className="h-5 w-5 text-red-400"
                   viewBox="0 0 20 20"
@@ -328,14 +328,14 @@ export default ${name};`;
             {/* 左侧面板 */}
             <div className="flex flex-col space-y-4 min-h-0">
               <div className="flex-1 flex flex-col space-y-4 min-h-0">
-                <div className="bg-gray-800 rounded-xl shadow-sm p-4 flex-shrink-0">
+                <div className="bg-gray-800 rounded-xl shadow-xs p-4 shrink-0">
                   <h2 className="text-lg font-semibold text-white mb-3">
                     SVG Preview
                   </h2>
                   <SvgPreview svgContent={svgContent} />
                 </div>
 
-                <div className="bg-gray-800 rounded-xl shadow-sm p-4 flex-1 min-h-0">
+                <div className="bg-gray-800 rounded-xl shadow-xs p-4 flex-1 min-h-0">
                   <h2 className="text-lg font-semibold text-white mb-3">
                     SVG Source
                   </h2>
@@ -348,8 +348,8 @@ export default ${name};`;
 
             {/* 右侧面板 */}
             {reactCode && (
-              <div className="bg-gray-800 rounded-xl shadow-sm p-4 flex flex-col min-h-0">
-                <div className="flex justify-between items-center mb-4 flex-shrink-0">
+              <div className="bg-gray-800 rounded-xl shadow-xs p-4 flex flex-col min-h-0">
+                <div className="flex justify-between items-center mb-4 shrink-0">
                   <h2 className="text-lg font-semibold text-white">
                     React Component
                   </h2>
@@ -361,7 +361,7 @@ export default ${name};`;
                       <select
                         value={fileType}
                         onChange={(e) => setFileType(e.target.value as FileType)}
-                        className="block w-24 px-3 py-1.5 text-sm border-2 border-gray-600 rounded-lg bg-gray-700 text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200"
+                        className="block w-24 px-3 py-1.5 text-sm border-2 border-gray-600 rounded-lg bg-gray-700 text-gray-200 focus:outline-hidden focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200"
                       >
                         <option value="tsx">TSX</option>
                         <option value="jsx">JSX</option>
@@ -369,7 +369,7 @@ export default ${name};`;
                     </div>
                     <button
                       onClick={copyToClipboard}
-                      className="inline-flex items-center px-3 py-1.5 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-200"
+                      className="inline-flex items-center px-3 py-1.5 border border-transparent text-sm font-medium rounded-md shadow-xs text-white bg-blue-600 hover:bg-blue-700 focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-200"
                     >
                       <svg
                         className="h-4 w-4 mr-2"
@@ -389,20 +389,20 @@ export default ${name};`;
                   </div>
                 </div>
 
-                <div className="mb-4 flex-shrink-0">
+                <div className="mb-4 shrink-0">
                   <label
                     htmlFor="componentName"
                     className="block text-sm font-medium text-gray-200 mb-2"
                   >
                     Component Name
                   </label>
-                  <div className="relative rounded-md shadow-sm">
+                  <div className="relative rounded-md shadow-xs">
                     <input
                       type="text"
                       id="componentName"
                       value={componentName}
                       onChange={handleComponentNameChange}
-                      className="block w-full px-3 py-1.5 text-sm border-2 border-gray-600 rounded-lg bg-gray-700 text-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200"
+                      className="block w-full px-3 py-1.5 text-sm border-2 border-gray-600 rounded-lg bg-gray-700 text-gray-200 focus:outline-hidden focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200"
                       placeholder="Enter component name"
                     />
                   </div>
