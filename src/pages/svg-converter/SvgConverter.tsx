@@ -6,6 +6,60 @@ import { Highlight, themes } from "prism-react-renderer";
 
 type FileType = "tsx" | "jsx";
 
+interface PreviewProps {
+  svgContent: string;
+  color: string;
+  size: number;
+}
+
+const Preview = ({ svgContent, color, size }: PreviewProps) => {
+  // 创建一个临时的 DOM 元素来解析 SVG
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(svgContent, "image/svg+xml");
+  const svgElement = doc.documentElement;
+
+  // 设置 SVG 的宽度和高度
+  svgElement.setAttribute("width", `${size}`);
+  svgElement.setAttribute("height", `${size}`);
+
+  // 设置 SVG 的颜色
+  svgElement.setAttribute("fill", color);
+  svgElement.setAttribute("stroke", color);
+
+  // 处理内部元素的颜色
+  const elements = svgElement.getElementsByTagName("*");
+  for (let i = 0; i < elements.length; i++) {
+    const element = elements[i];
+    if (element.getAttribute("fill") !== "none") {
+      element.setAttribute("fill", color);
+    }
+    if (element.getAttribute("stroke") !== "none") {
+      element.setAttribute("stroke", color);
+    }
+  }
+
+  return (
+    <div className="relative border border-gray-700 rounded-lg p-6 bg-white">
+      <div 
+        className="absolute inset-0" 
+        style={{
+          backgroundImage: `linear-gradient(45deg, #f3f4f6 25%, transparent 25%),
+            linear-gradient(-45deg, #f3f4f6 25%, transparent 25%),
+            linear-gradient(45deg, transparent 75%, #f3f4f6 75%),
+            linear-gradient(-45deg, transparent 75%, #f3f4f6 75%)`,
+          backgroundSize: '20px 20px',
+          backgroundPosition: '0 0, 0 10px, 10px -10px, -10px 0px',
+          opacity: 0.1
+        }}
+      />
+      <div
+        className="relative flex items-center justify-center min-h-[200px]"
+        dangerouslySetInnerHTML={{ __html: svgElement.outerHTML }}
+      />
+    </div>
+  );
+};
+
 const CodeBlock = ({ code, language }: { code: string; language: string }) => {
   return (
     <div className="relative w-full overflow-x-auto scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-gray-800 hover:scrollbar-thumb-gray-500">
@@ -103,6 +157,8 @@ export default function SvgConverter() {
   const [error, setError] = useState<string>("");
   const [componentName, setComponentName] = useState<string>("SvgComponent");
   const [fileType, setFileType] = useState<FileType>("tsx");
+  const [previewColor, setPreviewColor] = useState<string>("#000000");
+  const [previewSize, setPreviewSize] = useState<number>(100);
 
   const convertToReactComponent = useCallback(
     (svgString: string, name: string) => {
@@ -115,7 +171,7 @@ export default function SvgConverter() {
       const attributes = Array.from(svgElement.attributes)
         .filter((attr) => {
           // 过滤掉不需要的属性
-          return !["id"].includes(attr.name);
+          return !["id", "width", "height"].includes(attr.name);
         })
         .map((attr) => {
           // 将连字符属性名转换为驼峰命名
@@ -161,10 +217,11 @@ export default function SvgConverter() {
 
 interface ${name}Props extends React.SVGProps<SVGSVGElement> {
   title?: string;
+  size?: number;
 }
 
-export const ${name} = ({ title, ...props }: ${name}Props) => (
-  <svg ${attributes} {...props}>
+export const ${name} = ({ title, size = 24, ...props }: ${name}Props) => (
+  <svg width={size} height={size} ${attributes} {...props}>
     {title && <title>{title}</title>}
     ${content}
   </svg>
@@ -175,8 +232,8 @@ ${name}.displayName = '${name}';
 export default ${name};`
           : `import React from 'react';
 
-export const ${name} = ({ title, ...props }) => (
-  <svg ${attributes} {...props}>
+export const ${name} = ({ title, size = 24, ...props }) => (
+  <svg width={size} height={size} ${attributes} {...props}>
     {title && <title>{title}</title>}
     ${content}
   </svg>
@@ -258,12 +315,12 @@ export default ${name};`;
       )}
     >
       <Toaster />
-      <div className="flex-1 flex flex-col p-6">
-        <div className="text-center mb-6">
-          <h1 className="text-3xl font-extrabold text-white tracking-tight">
+      <div className="flex-1 flex flex-col p-4 md:p-6 overflow-hidden">
+        <div className="text-center mb-4 md:mb-6">
+          <h1 className="text-2xl md:text-3xl font-extrabold text-white tracking-tight">
             SVG to React Component
           </h1>
-          <p className="text-base text-gray-400 mt-1">
+          <p className="text-sm md:text-base text-gray-400 mt-1">
             Transform your SVG files into reusable React components
           </p>
         </div>
@@ -324,10 +381,10 @@ export default ${name};`;
         )}
 
         {svgContent && (
-          <div className="flex-1 grid grid-cols-2 gap-6 min-h-0">
+          <div className="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6 min-h-0 overflow-hidden">
             {/* 左侧面板 */}
-            <div className="flex flex-col space-y-4 min-h-0">
-              <div className="flex-1 flex flex-col space-y-4 min-h-0">
+            <div className="flex flex-col space-y-4 min-h-0 overflow-hidden">
+              <div className="flex-1 flex flex-col space-y-4 min-h-0 overflow-hidden">
                 <div className="bg-gray-800 rounded-xl shadow-xs p-4 shrink-0">
                   <h2 className="text-lg font-semibold text-white mb-3">
                     SVG Preview
@@ -335,7 +392,7 @@ export default ${name};`;
                   <SvgPreview svgContent={svgContent} />
                 </div>
 
-                <div className="bg-gray-800 rounded-xl shadow-xs p-4 flex-1 min-h-0">
+                <div className="bg-gray-800 rounded-xl shadow-xs p-4 flex-1 min-h-0 overflow-hidden">
                   <h2 className="text-lg font-semibold text-white mb-3">
                     SVG Source
                   </h2>
@@ -348,8 +405,8 @@ export default ${name};`;
 
             {/* 右侧面板 */}
             {reactCode && (
-              <div className="bg-gray-800 rounded-xl shadow-xs p-4 flex flex-col min-h-0">
-                <div className="flex justify-between items-center mb-4 shrink-0">
+              <div className="bg-gray-800 rounded-xl shadow-xs p-4 flex flex-col min-h-0 overflow-hidden">
+                <div className="flex flex-wrap justify-between items-center gap-4 mb-4 shrink-0">
                   <h2 className="text-lg font-semibold text-white">
                     React Component
                   </h2>
@@ -407,8 +464,69 @@ export default ${name};`;
                     />
                   </div>
                 </div>
+
+                <div className="mb-4 shrink-0">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label
+                        htmlFor="previewColor"
+                        className="block text-sm font-medium text-gray-200 mb-2"
+                      >
+                        Color
+                      </label>
+                      <div className="flex items-center space-x-2">
+                        <input
+                          type="color"
+                          id="previewColor"
+                          value={previewColor}
+                          onChange={(e) => setPreviewColor(e.target.value)}
+                          className="h-8 w-8 rounded cursor-pointer"
+                        />
+                        <input
+                          type="text"
+                          value={previewColor}
+                          onChange={(e) => setPreviewColor(e.target.value)}
+                          className="block w-full px-3 py-1.5 text-sm border-2 border-gray-600 rounded-lg bg-gray-700 text-gray-200 focus:outline-hidden focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label
+                        htmlFor="previewSize"
+                        className="block text-sm font-medium text-gray-200 mb-2"
+                      >
+                        Size (px)
+                      </label>
+                      <input
+                        type="number"
+                        id="previewSize"
+                        value={previewSize}
+                        onChange={(e) => setPreviewSize(Number(e.target.value))}
+                        min="10"
+                        max="500"
+                        className="block w-full px-3 py-1.5 text-sm border-2 border-gray-600 rounded-lg bg-gray-700 text-gray-200 focus:outline-hidden focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mb-4 shrink-0">
+                  <h3 className="text-sm font-medium text-gray-200 mb-2">
+                    Preview
+                  </h3>
+                  <div className="max-h-[200px] overflow-auto">
+                    <Preview
+                      svgContent={svgContent}
+                      color={previewColor}
+                      size={previewSize}
+                    />
+                  </div>
+                </div>
+
                 <div className="rounded-lg overflow-hidden bg-gray-900 flex-1 min-h-0">
-                  <CodeBlock code={reactCode} language={fileType} />
+                  <div className="h-full overflow-y-auto scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-gray-800 hover:scrollbar-thumb-gray-500">
+                    <CodeBlock code={reactCode} language={fileType} />
+                  </div>
                 </div>
               </div>
             )}
