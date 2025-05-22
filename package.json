@@ -28,14 +28,14 @@
     "react-dropzone": "^14.3.8",
     "react-hot-toast": "^2.5.2",
     "react-router-dom": "^7.6.0",
-    "zustand": "^5.0.4"
+    "zustand": "^5.0.5"
   },
   "devDependencies": {
     "@eslint/js": "^9.27.0",
     "@tailwindcss/postcss": "^4.1.7",
     "@types/lodash-es": "^4.17.12",
-    "@types/node": "^22.15.19",
-    "@types/react": "^19.1.4",
+    "@types/node": "^22.15.21",
+    "@types/react": "^19.1.5",
     "@types/react-dom": "^19.1.5",
     "@vitejs/plugin-react": "^4.4.1",
     "@xiping/vite-version": "^1.0.10",
@@ -47,7 +47,7 @@
     "only-allow": "^1.2.1",
     "postcss": "^8.5.3",
     "prettier": "^3.5.3",
-    "sharp": "^0.34.1",
+    "sharp": "^0.34.2",
     "svgo": "^3.3.2",
     "tailwind-scrollbar": "^4.0.2",
     "tailwindcss": "^4.1.7",
