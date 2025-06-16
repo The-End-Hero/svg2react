@@ -3,6 +3,7 @@ import { useDropzone } from "react-dropzone";
 import clsx from "clsx";
 import toast, { Toaster } from "react-hot-toast";
 import { Highlight, themes } from "prism-react-renderer";
+import { posthog } from "posthog-js";
 
 type FileType = "tsx" | "jsx";
 
@@ -263,6 +264,7 @@ export default ${name};`;
       if (!file) return;
 
       const fileName = file.name.replace(/\.svg$/i, "");
+      posthog.capture('drop svg file', { filename: fileName })
       const pascalCaseName = fileName
         .split(/[-_\s]/)
         .map(
@@ -315,7 +317,7 @@ export default ${name};`;
       {...getRootProps()}
       className={clsx(
         "h-screen bg-gray-900 flex flex-col transition-all duration-200 ease-in-out",
-        isDragActive && "bg-gray-800"
+        isDragActive && "bg-gray-800",
       )}
     >
       <Toaster />
@@ -377,7 +379,9 @@ export default ${name};`;
                   <p className="text-xl font-medium text-gray-200">
                     Drag and drop your SVG file here
                   </p>
-                  <p className="text-base text-gray-400 mt-2">or click anywhere to browse</p>
+                  <p className="text-base text-gray-400 mt-2">
+                    or click anywhere to browse
+                  </p>
                 </div>
               )}
             </div>
@@ -444,7 +448,9 @@ export default ${name};`;
                       </label>
                       <select
                         value={fileType}
-                        onChange={(e) => setFileType(e.target.value as FileType)}
+                        onChange={(e) =>
+                          setFileType(e.target.value as FileType)
+                        }
                         className="block w-24 px-3 py-1.5 text-sm border-2 border-gray-600 rounded-lg bg-gray-700 text-gray-200 focus:outline-hidden focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200"
                       >
                         <option value="tsx">TSX</option>
