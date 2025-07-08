@@ -23,20 +23,32 @@ const Preview = ({ svgContent, color, size }: PreviewProps) => {
   svgElement.setAttribute("width", `${size}`);
   svgElement.setAttribute("height", `${size}`);
 
-  // 设置 SVG 的颜色
-  svgElement.setAttribute("fill", color);
-  svgElement.setAttribute("stroke", color);
-
-  // 处理内部元素的颜色
+  // 处理内部元素的颜色，保持原有的空心/实心特性
   const elements = svgElement.getElementsByTagName("*");
   for (let i = 0; i < elements.length; i++) {
     const element = elements[i];
-    if (element.getAttribute("fill") !== "none") {
+    const originalFill = element.getAttribute("fill");
+    const originalStroke = element.getAttribute("stroke");
+    
+    // 只有当元素原本有颜色时才设置新颜色，保持none值不变
+    if (originalFill && originalFill !== "none") {
       element.setAttribute("fill", color);
     }
-    if (element.getAttribute("stroke") !== "none") {
+    if (originalStroke && originalStroke !== "none") {
       element.setAttribute("stroke", color);
     }
+  }
+
+  // 设置根SVG元素的默认颜色（如果没有子元素设置的话）
+  // 只有当根元素没有fill属性，或者fill不是none时才设置默认颜色
+  const rootFill = svgElement.getAttribute("fill");
+  if (!rootFill || (rootFill && rootFill !== "none")) {
+    svgElement.setAttribute("fill", color);
+  }
+  
+  const rootStroke = svgElement.getAttribute("stroke");
+  if (!rootStroke || (rootStroke && rootStroke !== "none")) {
+    svgElement.setAttribute("stroke", color);
   }
 
   return (
@@ -132,13 +144,11 @@ const formatSvg = (svgString: string): string => {
     return `<${tag}></${tag.split(" ")[0]}>`;
   });
 
-  // 添加适当的缩进和换行
+  // 清理内容：移除多余的空白字符和换行符，避免格式化时产生 {" "}
   content = content
+    .replace(/\s+/g, ' ') // 将多个空白字符替换为单个空格
     .replace(/>\s+</g, "><") // 移除标签之间的空白
-    .replace(/<([^>]+)>/g, (_, tag) => {
-      // 为每个标签添加缩进
-      return `  <${tag}>`;
-    });
+    .trim(); // 移除开头和结尾的空白
 
   // 组合最终的格式化 SVG
   return `<svg ${attributes}>${content}</svg>`;
@@ -181,9 +191,13 @@ export default function SvgConverter() {
             (_: string, letter: string) => letter.toUpperCase(),
           );
 
-          // 处理颜色相关的属性
-          if (["fill", "stroke"].includes(attr.name) && attr.value !== "none") {
-            return `${reactAttrName}="currentColor"`;
+          // 处理颜色相关的属性，保持none值不变
+          if (["fill", "stroke"].includes(attr.name)) {
+            if (attr.value === "none") {
+              return `${reactAttrName}="none"`;
+            } else if (attr.value && attr.value !== "none") {
+              return `${reactAttrName}="currentColor"`;
+            }
           }
           return `${reactAttrName}="${attr.value}"`;
         })
@@ -191,9 +205,20 @@ export default function SvgConverter() {
 
       // 获取 SVG 的内容并处理内部元素的颜色和属性名
       let content = svgElement.innerHTML;
+      
+      // 清理内容：移除多余的空白字符和换行符，避免格式化时产生 {" "}
+      content = content
+        .replace(/\s+/g, ' ') // 将多个空白字符替换为单个空格
+        .replace(/>\s+</g, '><') // 移除标签之间的空白
+        .trim(); // 移除开头和结尾的空白
+      
       content = content.replace(/(fill|stroke)="[^"]*"/g, (match, attr) => {
-        if (match.includes("none")) return match;
-        return `${attr}="currentColor"`;
+        if (match.includes('="none"')) {
+          return `${attr}="none"`;
+        } else if (match.includes('="')) {
+          return `${attr}="currentColor"`;
+        }
+        return match;
       });
 
       // 处理内部元素的属性名
