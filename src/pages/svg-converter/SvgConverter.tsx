@@ -309,7 +309,7 @@ export default ${name};`;
     }
   }, []);
 
-  const { getRootProps, isDragActive } = useDropzone({
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
     accept: {
       "image/svg+xml": [".svg"],
@@ -345,6 +345,7 @@ export default ${name};`;
         isDragActive && "bg-gray-800",
       )}
     >
+      <input {...getInputProps()} />
       <Toaster />
       <div className="flex-1 flex flex-col p-4 md:p-6 overflow-hidden">
         <div className="text-center mb-4 md:mb-6">
@@ -476,6 +477,7 @@ export default ${name};`;
                         onChange={(e) =>
                           setFileType(e.target.value as FileType)
                         }
+                        onClick={(e) => e.stopPropagation()}
                         className="block w-24 px-3 py-1.5 text-sm border-2 border-gray-600 rounded-lg bg-gray-700 text-gray-200 focus:outline-hidden focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200"
                       >
                         <option value="tsx">TSX</option>
@@ -483,7 +485,10 @@ export default ${name};`;
                       </select>
                     </div>
                     <button
-                      onClick={copyToClipboard}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        copyToClipboard();
+                      }}
                       className="inline-flex items-center px-3 py-1.5 border border-transparent text-sm font-medium rounded-md shadow-xs text-white bg-blue-600 hover:bg-blue-700 focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-200"
                     >
                       <svg
@@ -517,6 +522,7 @@ export default ${name};`;
                       id="componentName"
                       value={componentName}
                       onChange={handleComponentNameChange}
+                      onClick={(e) => e.stopPropagation()}
                       className="block w-full px-3 py-1.5 text-sm border-2 border-gray-600 rounded-lg bg-gray-700 text-gray-200 focus:outline-hidden focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200"
                       placeholder="Enter component name"
                     />
@@ -538,12 +544,14 @@ export default ${name};`;
                           id="previewColor"
                           value={previewColor}
                           onChange={(e) => setPreviewColor(e.target.value)}
+                          onClick={(e) => e.stopPropagation()}
                           className="h-8 w-8 rounded cursor-pointer"
                         />
                         <input
                           type="text"
                           value={previewColor}
                           onChange={(e) => setPreviewColor(e.target.value)}
+                          onClick={(e) => e.stopPropagation()}
                           className="block w-full px-3 py-1.5 text-sm border-2 border-gray-600 rounded-lg bg-gray-700 text-gray-200 focus:outline-hidden focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200"
                         />
                       </div>
@@ -560,6 +568,7 @@ export default ${name};`;
                         id="previewSize"
                         value={previewSize}
                         onChange={(e) => setPreviewSize(Number(e.target.value))}
+                        onClick={(e) => e.stopPropagation()}
                         min="10"
                         max="500"
                         className="block w-full px-3 py-1.5 text-sm border-2 border-gray-600 rounded-lg bg-gray-700 text-gray-200 focus:outline-hidden focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200"
