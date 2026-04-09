@@ -13,6 +13,48 @@ interface PreviewProps {
   size: number;
 }
 
+interface UploadZoneProps {
+  title: string;
+  subtitle: string;
+  hint?: string;
+  isDragActive: boolean;
+  onOpen: () => void;
+  className?: string;
+}
+
+const UploadZone = ({
+  title,
+  subtitle,
+  hint,
+  isDragActive,
+  onOpen,
+  className,
+}: UploadZoneProps) => {
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onOpen();
+        }
+      }}
+      className={clsx(
+        "w-full rounded-xl border-2 border-dashed px-4 py-6 text-center transition-colors duration-200",
+        isDragActive
+          ? "border-blue-400 bg-blue-500/10"
+          : "border-gray-600 bg-gray-800/50 hover:border-gray-500",
+        className,
+      )}
+    >
+      <p className="text-sm md:text-base font-medium text-gray-100">{title}</p>
+      <p className="text-xs md:text-sm text-gray-300 mt-2">{subtitle}</p>
+      {hint && <p className="text-xs text-gray-400 mt-2">{hint}</p>}
+    </button>
+  );
+};
+
 const Preview = ({ svgContent, color, size }: PreviewProps) => {
   // 创建一个临时的 DOM 元素来解析 SVG
   const parser = new DOMParser();
@@ -309,12 +351,13 @@ export default ${name};`;
     }
   }, []);
 
-  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+  const { getRootProps, getInputProps, isDragActive, open } = useDropzone({
     onDrop,
     accept: {
       "image/svg+xml": [".svg"],
     },
     multiple: false,
+    noClick: true,
   });
 
   const copyToClipboard = async () => {
@@ -382,7 +425,7 @@ export default ${name};`;
 
         {!svgContent && (
           <div className="flex-1 flex flex-col items-center justify-center">
-            <div className="text-center space-y-4">
+            <div className="w-full max-w-2xl space-y-4">
               <svg
                 className="mx-auto h-16 w-16 text-gray-400"
                 fill="none"
@@ -396,20 +439,17 @@ export default ${name};`;
                   d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
                 />
               </svg>
-              {isDragActive ? (
-                <p className="text-xl font-medium text-blue-400">
-                  Drop your SVG file here
-                </p>
-              ) : (
-                <div>
-                  <p className="text-xl font-medium text-gray-200">
-                    Drag and drop your SVG file here
-                  </p>
-                  <p className="text-base text-gray-400 mt-2">
-                    or click anywhere to browse
-                  </p>
-                </div>
-              )}
+              <UploadZone
+                title={
+                  isDragActive
+                    ? "Drop your SVG file to upload"
+                    : "Click to choose an SVG file"
+                }
+                subtitle="You can also drag and drop an SVG anywhere on this page."
+                hint="Only .svg files are accepted."
+                isDragActive={isDragActive}
+                onOpen={open}
+              />
             </div>
           </div>
         )}
@@ -438,7 +478,20 @@ export default ${name};`;
         )}
 
         {svgContent && (
-          <div className="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6 min-h-0 overflow-hidden">
+          <div className="flex-1 flex flex-col gap-4 min-h-0 overflow-hidden">
+            <UploadZone
+              title={
+                isDragActive
+                  ? "Drop to replace current SVG"
+                  : "Replace current SVG"
+              }
+              subtitle="Click this area to choose another SVG file."
+              hint="You can also drag and drop an SVG anywhere on this page."
+              isDragActive={isDragActive}
+              onOpen={open}
+              className="shrink-0"
+            />
+            <div className="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6 min-h-0 overflow-hidden">
             {/* 左侧面板 */}
             <div className="flex flex-col space-y-4 min-h-0 overflow-hidden">
               <div className="flex-1 flex flex-col space-y-4 min-h-0 overflow-hidden">
@@ -597,6 +650,7 @@ export default ${name};`;
                 </div>
               </div>
             )}
+          </div>
           </div>
         )}
       </div>
