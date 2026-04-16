@@ -1,11 +1,14 @@
-import { useCallback, useState, useEffect } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useDropzone } from "react-dropzone";
 import clsx from "clsx";
 import toast, { Toaster } from "react-hot-toast";
 import { Highlight, themes } from "prism-react-renderer";
 import { posthog } from "posthog-js";
-
-type FileType = "tsx" | "jsx";
+import {
+  convertToReactComponent,
+  formatSvg,
+  type FileType,
+} from "./svgConverter.utils";
 
 interface PreviewProps {
   svgContent: string;
@@ -108,7 +111,7 @@ const Preview = ({ svgContent, color, size }: PreviewProps) => {
         }}
       />
       <div
-        className="relative flex items-center justify-center min-h-[200px]"
+        className="relative flex items-center justify-center min-h-[80px]"
         dangerouslySetInnerHTML={{ __html: svgElement.outerHTML }}
       />
     </div>
@@ -158,171 +161,25 @@ const SvgPreview = ({ svgContent }: { svgContent: string }) => {
         }}
       />
       <div
-        className="relative flex items-center justify-center min-h-[200px]"
+        className="relative flex items-center justify-center min-h-[80px]"
         dangerouslySetInnerHTML={{ __html: svgContent }}
       />
     </div>
   );
 };
 
-// 格式化 SVG 字符串
-const formatSvg = (svgString: string): string => {
-  // 创建一个临时的 DOM 元素来解析 SVG
-  const parser = new DOMParser();
-  const doc = parser.parseFromString(svgString, "image/svg+xml");
-  const svgElement = doc.documentElement;
-
-  // 获取所有属性并排序
-  const attributes = Array.from(svgElement.attributes)
-    .sort((a, b) => a.name.localeCompare(b.name))
-    .map(attr => `${attr.name}="${attr.value}"`)
-    .join(" ");
-
-  // 获取内部内容并格式化
-  let content = svgElement.innerHTML;
-  
-  // 处理自闭合标签
-  content = content.replace(/<([^>]+)\/>/g, (_, tag) => {
-    return `<${tag}></${tag.split(" ")[0]}>`;
-  });
-
-  // 清理内容：移除多余的空白字符和换行符，避免格式化时产生 {" "}
-  content = content
-    .replace(/\s+/g, ' ') // 将多个空白字符替换为单个空格
-    .replace(/>\s+</g, "><") // 移除标签之间的空白
-    .trim(); // 移除开头和结尾的空白
-
-  // 组合最终的格式化 SVG
-  return `<svg ${attributes}>${content}</svg>`;
-};
-
-// 格式化 React 组件代码
-const formatReactCode = (code: string): string => {
-  // 移除多余的空行
-  return code
-    .replace(/\n\s*\n/g, '\n') // 移除连续的空行
-    .replace(/^\s+|\s+$/g, ''); // 移除开头和结尾的空白
-};
-
 export default function SvgConverter() {
   const [svgContent, setSvgContent] = useState<string>("");
-  const [reactCode, setReactCode] = useState<string>("");
   const [error, setError] = useState<string>("");
   const [componentName, setComponentName] = useState<string>("SvgComponent");
   const [fileType, setFileType] = useState<FileType>("tsx");
   const [previewColor, setPreviewColor] = useState<string>("#000000");
   const [previewSize, setPreviewSize] = useState<number>(100);
 
-  const convertToReactComponent = useCallback(
-    (svgString: string, name: string) => {
-      // 创建一个临时的 DOM 元素来解析 SVG
-      const parser = new DOMParser();
-      const doc = parser.parseFromString(svgString, "image/svg+xml");
-      const svgElement = doc.documentElement;
-
-      // 转换属性名并过滤不需要的属性
-      const attributes = Array.from(svgElement.attributes)
-        .filter((attr) => {
-          // 过滤掉不需要的属性
-          return !["id", "width", "height"].includes(attr.name);
-        })
-        .map((attr) => {
-          // 将连字符属性名转换为驼峰命名
-          const reactAttrName = attr.name.replace(
-            /-([a-z])/g,
-            (_: string, letter: string) => letter.toUpperCase(),
-          );
-
-          // 处理颜色相关的属性，保持none值不变
-          if (["fill", "stroke"].includes(attr.name)) {
-            if (attr.value === "none") {
-              return `${reactAttrName}="none"`;
-            } else if (attr.value && attr.value !== "none") {
-              return `${reactAttrName}="currentColor"`;
-            }
-          }
-          return `${reactAttrName}="${attr.value}"`;
-        })
-        .join(" ");
-
-      // 获取 SVG 的内容并处理内部元素的颜色和属性名
-      let content = svgElement.innerHTML;
-      
-      // 清理内容：移除多余的空白字符和换行符，避免格式化时产生 {" "}
-      content = content
-        .replace(/\s+/g, ' ') // 将多个空白字符替换为单个空格
-        .replace(/>\s+</g, '><') // 移除标签之间的空白
-        .trim(); // 移除开头和结尾的空白
-      
-      content = content.replace(/(fill|stroke)="[^"]*"/g, (match, attr) => {
-        if (match.includes('="none"')) {
-          return `${attr}="none"`;
-        } else if (match.includes('="')) {
-          return `${attr}="currentColor"`;
-        }
-        return match;
-      });
-
-      // 处理内部元素的属性名
-      content = content.replace(
-        /([a-z-]+)=/g,
-        (_, attr: string) => {
-          const reactAttrName = attr.replace(
-            /-([a-z])/g,
-            (_: string, letter: string) => letter.toUpperCase(),
-          );
-          return `${reactAttrName}=`;
-        },
-      );
-
-      // 移除内部元素的id属性
-      content = content.replace(/\s+id="[^"]*"/g, "");
-
-      // 根据文件类型生成不同的组件代码
-      const componentCode =
-        fileType === "tsx"
-          ? `import React from 'react';
-
-interface ${name}Props extends React.SVGProps<SVGSVGElement> {
-  title?: string;
-  size?: number;
-}
-
-export const ${name} = ({ title, size = 24, ...props }: ${name}Props) => (
-  <svg width={size} height={size} ${attributes} {...props}>
-    {title && <title>{title}</title>}
-    ${content}
-  </svg>
-);
-
-${name}.displayName = '${name}';
-
-export default ${name};`
-          : `import React from 'react';
-
-export const ${name} = ({ title, size = 24, ...props }) => (
-  <svg width={size} height={size} ${attributes} {...props}>
-    {title && <title>{title}</title>}
-    ${content}
-  </svg>
-);
-
-${name}.displayName = '${name}';
-
-export default ${name};`;
-
-      return formatReactCode(componentCode);
-    },
-    [fileType],
-  );
-
-  // 当 fileType 或 svgContent 改变时重新生成代码
-  useEffect(() => {
-    if (svgContent) {
-      const newCode = convertToReactComponent(svgContent, componentName);
-      setReactCode(newCode);
-    }
-  }, [fileType, svgContent, componentName, convertToReactComponent]);
+  const reactCode = useMemo(() => {
+    if (!svgContent) return "";
+    return convertToReactComponent(svgContent, componentName, fileType);
+  }, [fileType, svgContent, componentName]);
 
   const onDrop = useCallback(async (acceptedFiles: File[]) => {
     try {
