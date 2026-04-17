@@ -6,6 +6,31 @@ const toReactAttrName = (attrName: string): string =>
     letter.toUpperCase(),
   );
 
+// 将 style 字符串转换为 React style 对象字面量字符串。
+const toReactStyleLiteral = (styleValue: string): string => {
+  const styleEntries = styleValue
+    .split(";")
+    .map((entry) => entry.trim())
+    .filter(Boolean)
+    .map((entry) => {
+      const colonIndex = entry.indexOf(":");
+      if (colonIndex === -1) return null;
+      const rawName = entry.slice(0, colonIndex).trim();
+      const rawValue = entry.slice(colonIndex + 1).trim();
+      if (!rawName || !rawValue) return null;
+      return [toReactAttrName(rawName), rawValue.replace(/"/g, '\\"')] as const;
+    })
+    .filter((entry): entry is readonly [string, string] => entry !== null);
+
+  if (!styleEntries.length) return "{{}}";
+
+  const styleBody = styleEntries
+    .map(([name, value]) => `${name}: "${value}"`)
+    .join(", ");
+
+  return `{{ ${styleBody} }}`;
+};
+
 // 规范化原始 SVG 字符串，便于后续稳定转换与展示。
 export const formatSvg = (svgString: string): string => {
   const parser = new DOMParser();
@@ -50,6 +75,9 @@ export const convertToReactComponent = (
     .filter((attr) => !["id", "width", "height"].includes(attr.name))
     .map((attr) => {
       const reactAttrName = toReactAttrName(attr.name);
+      if (attr.name === "style") {
+        return `style=${toReactStyleLiteral(attr.value)}`;
+      }
       // 颜色统一改为 currentColor，保留 none 以维持原有镂空效果。
       if (["fill", "stroke"].includes(attr.name)) {
         if (attr.value === "none") return `${reactAttrName}="none"`;
@@ -62,6 +90,11 @@ export const convertToReactComponent = (
   let content = svgElement.innerHTML;
   content = content.replace(/\s+/g, " ").replace(/>\s+</g, "><").trim();
 
+  // 将内部 style 属性转换为 React 支持的对象形式。
+  content = content.replace(/style="([^"]*)"/g, (_, styleValue: string) => {
+    return `style=${toReactStyleLiteral(styleValue)}`;
+  });
+
   // 内部节点同样执行颜色规范，保证整体受 currentColor 控制。
   content = content.replace(/(fill|stroke)="[^"]*"/g, (match, attr) => {
     if (match.includes('="none"')) return `${attr}="none"`;
@@ -72,9 +105,6 @@ export const convertToReactComponent = (
   content = content.replace(/([a-z-]+)=/g, (_, attr: string) => {
     return `${toReactAttrName(attr)}=`;
   });
-
-  // 清理内部 id，避免多图标场景下 DOM id 冲突。
-  content = content.replace(/\s+id="[^"]*"/g, "");
 
   // 按目标文件类型拼接 TSX 或 JSX 组件模板。
   const componentCode =
