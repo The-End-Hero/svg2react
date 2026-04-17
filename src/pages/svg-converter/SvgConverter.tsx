@@ -4,11 +4,16 @@ import clsx from "clsx";
 import toast, { Toaster } from "react-hot-toast";
 import { Highlight, themes } from "prism-react-renderer";
 import { posthog } from "posthog-js";
+// import {
+//   convertToReactComponent,
+//   formatSvg,
+//   type FileType,
+// } from "./svgConverter.utils";
 import {
   convertToReactComponent,
   formatSvg,
   type FileType,
-} from "./svgConverter.utils";
+} from "@xiping/svg-to-react";
 
 interface PreviewProps {
   svgContent: string;
@@ -74,7 +79,7 @@ const Preview = ({ svgContent, color, size }: PreviewProps) => {
     const element = elements[i];
     const originalFill = element.getAttribute("fill");
     const originalStroke = element.getAttribute("stroke");
-    
+
     // 只有当元素原本有颜色时才设置新颜色，保持none值不变
     if (originalFill && originalFill !== "none") {
       element.setAttribute("fill", color);
@@ -90,7 +95,7 @@ const Preview = ({ svgContent, color, size }: PreviewProps) => {
   if (!rootFill || (rootFill && rootFill !== "none")) {
     svgElement.setAttribute("fill", color);
   }
-  
+
   const rootStroke = svgElement.getAttribute("stroke");
   if (!rootStroke || (rootStroke && rootStroke !== "none")) {
     svgElement.setAttribute("stroke", color);
@@ -98,16 +103,16 @@ const Preview = ({ svgContent, color, size }: PreviewProps) => {
 
   return (
     <div className="relative border border-gray-700 rounded-lg p-6 bg-white">
-      <div 
-        className="absolute inset-0" 
+      <div
+        className="absolute inset-0"
         style={{
           backgroundImage: `linear-gradient(45deg, #f3f4f6 25%, transparent 25%),
             linear-gradient(-45deg, #f3f4f6 25%, transparent 25%),
             linear-gradient(45deg, transparent 75%, #f3f4f6 75%),
             linear-gradient(-45deg, transparent 75%, #f3f4f6 75%)`,
-          backgroundSize: '20px 20px',
-          backgroundPosition: '0 0, 0 10px, 10px -10px, -10px 0px',
-          opacity: 0.1
+          backgroundSize: "20px 20px",
+          backgroundPosition: "0 0, 0 10px, 10px -10px, -10px 0px",
+          opacity: 0.1,
         }}
       />
       <div
@@ -122,7 +127,11 @@ const CodeBlock = ({ code, language }: { code: string; language: string }) => {
   return (
     <div className="relative w-full overflow-x-auto scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-gray-800 hover:scrollbar-thumb-gray-500">
       <div className="min-w-full inline-block">
-        <Highlight theme={themes.nightOwl} code={code.trim()} language={language}>
+        <Highlight
+          theme={themes.nightOwl}
+          code={code.trim()}
+          language={language}
+        >
           {({ className, style, tokens, getLineProps, getTokenProps }) => (
             <pre className={className} style={{ ...style, margin: 0 }}>
               {tokens.map((line, i) => (
@@ -148,16 +157,16 @@ const CodeBlock = ({ code, language }: { code: string; language: string }) => {
 const SvgPreview = ({ svgContent }: { svgContent: string }) => {
   return (
     <div className="relative border border-gray-700 rounded-lg p-6 bg-white">
-      <div 
-        className="absolute inset-0" 
+      <div
+        className="absolute inset-0"
         style={{
           backgroundImage: `linear-gradient(45deg, #f3f4f6 25%, transparent 25%),
             linear-gradient(-45deg, #f3f4f6 25%, transparent 25%),
             linear-gradient(45deg, transparent 75%, #f3f4f6 75%),
             linear-gradient(-45deg, transparent 75%, #f3f4f6 75%)`,
-          backgroundSize: '20px 20px',
-          backgroundPosition: '0 0, 0 10px, 10px -10px, -10px 0px',
-          opacity: 0.1
+          backgroundSize: "20px 20px",
+          backgroundPosition: "0 0, 0 10px, 10px -10px, -10px 0px",
+          opacity: 0.1,
         }}
       />
       <div
@@ -188,7 +197,7 @@ export default function SvgConverter() {
       if (!file) return;
 
       const fileName = file.name.replace(/\.svg$/i, "");
-      posthog.capture('drop svg file', { filename: fileName })
+      posthog.capture("drop svg file", { filename: fileName });
       const pascalCaseName = fileName
         .split(/[-_\s]/)
         .map(
@@ -199,7 +208,7 @@ export default function SvgConverter() {
       setComponentName(newComponentName);
 
       const text = await file.text();
-      
+
       // 格式化 SVG 内容
       const formattedSvg = formatSvg(text);
       setSvgContent(formattedSvg);
@@ -234,7 +243,7 @@ export default function SvgConverter() {
   };
 
   const openGithub = () => {
-    window.open('https://github.com/The-End-Hero/svg2react', '_blank');
+    window.open("https://github.com/The-End-Hero/svg2react", "_blank");
   };
 
   return (
@@ -349,165 +358,167 @@ export default function SvgConverter() {
               className="shrink-0"
             />
             <div className="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6 min-h-0 overflow-hidden">
-            {/* 左侧面板 */}
-            <div className="flex flex-col space-y-4 min-h-0 overflow-hidden">
-              <div className="flex-1 flex flex-col space-y-4 min-h-0 overflow-hidden">
-                <div className="bg-gray-800 rounded-xl shadow-xs p-4 shrink-0">
-                  <h2 className="text-lg font-semibold text-white mb-3">
-                    SVG Preview
-                  </h2>
-                  <SvgPreview svgContent={svgContent} />
-                </div>
+              {/* 左侧面板 */}
+              <div className="flex flex-col space-y-4 min-h-0 overflow-hidden">
+                <div className="flex-1 flex flex-col space-y-4 min-h-0 overflow-hidden">
+                  <div className="bg-gray-800 rounded-xl shadow-xs p-4 shrink-0">
+                    <h2 className="text-lg font-semibold text-white mb-3">
+                      SVG Preview
+                    </h2>
+                    <SvgPreview svgContent={svgContent} />
+                  </div>
 
-                <div className="bg-gray-800 rounded-xl shadow-xs p-4 flex-1 min-h-0 overflow-hidden">
-                  <h2 className="text-lg font-semibold text-white mb-3">
-                    SVG Source
-                  </h2>
-                  <div className="rounded-lg overflow-hidden bg-gray-900 h-[calc(100%-2rem)]">
-                    <CodeBlock code={svgContent} language="xml" />
+                  <div className="bg-gray-800 rounded-xl shadow-xs p-4 flex-1 min-h-0 overflow-hidden">
+                    <h2 className="text-lg font-semibold text-white mb-3">
+                      SVG Source
+                    </h2>
+                    <div className="rounded-lg overflow-hidden bg-gray-900 h-[calc(100%-2rem)]">
+                      <CodeBlock code={svgContent} language="xml" />
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
 
-            {/* 右侧面板 */}
-            {reactCode && (
-              <div className="bg-gray-800 rounded-xl shadow-xs p-4 flex flex-col min-h-0 overflow-hidden">
-                <div className="flex flex-wrap justify-between items-center gap-4 mb-4 shrink-0">
-                  <h2 className="text-lg font-semibold text-white">
-                    React Component
-                  </h2>
-                  <div className="flex items-center space-x-4">
-                    <div className="flex items-center space-x-2">
-                      <label className="text-sm font-medium text-gray-300">
-                        File Type:
-                      </label>
-                      <select
-                        value={fileType}
-                        onChange={(e) =>
-                          setFileType(e.target.value as FileType)
-                        }
-                        onClick={(e) => e.stopPropagation()}
-                        className="block w-24 px-3 py-1.5 text-sm border-2 border-gray-600 rounded-lg bg-gray-700 text-gray-200 focus:outline-hidden focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200"
-                      >
-                        <option value="tsx">TSX</option>
-                        <option value="jsx">JSX</option>
-                      </select>
-                    </div>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        copyToClipboard();
-                      }}
-                      className="inline-flex items-center px-3 py-1.5 border border-transparent text-sm font-medium rounded-md shadow-xs text-white bg-blue-600 hover:bg-blue-700 focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-200"
-                    >
-                      <svg
-                        className="h-4 w-4 mr-2"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"
-                        />
-                      </svg>
-                      Copy Code
-                    </button>
-                  </div>
-                </div>
-
-                <div className="mb-4 shrink-0">
-                  <label
-                    htmlFor="componentName"
-                    className="block text-sm font-medium text-gray-200 mb-2"
-                  >
-                    Component Name
-                  </label>
-                  <div className="relative rounded-md shadow-xs">
-                    <input
-                      type="text"
-                      id="componentName"
-                      value={componentName}
-                      onChange={handleComponentNameChange}
-                      onClick={(e) => e.stopPropagation()}
-                      className="block w-full px-3 py-1.5 text-sm border-2 border-gray-600 rounded-lg bg-gray-700 text-gray-200 focus:outline-hidden focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200"
-                      placeholder="Enter component name"
-                    />
-                  </div>
-                </div>
-
-                <div className="mb-4 shrink-0">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                      <label
-                        htmlFor="previewColor"
-                        className="block text-sm font-medium text-gray-200 mb-2"
-                      >
-                        Color
-                      </label>
+              {/* 右侧面板 */}
+              {reactCode && (
+                <div className="bg-gray-800 rounded-xl shadow-xs p-4 flex flex-col min-h-0 overflow-hidden">
+                  <div className="flex flex-wrap justify-between items-center gap-4 mb-4 shrink-0">
+                    <h2 className="text-lg font-semibold text-white">
+                      React Component
+                    </h2>
+                    <div className="flex items-center space-x-4">
                       <div className="flex items-center space-x-2">
-                        <input
-                          type="color"
-                          id="previewColor"
-                          value={previewColor}
-                          onChange={(e) => setPreviewColor(e.target.value)}
+                        <label className="text-sm font-medium text-gray-300">
+                          File Type:
+                        </label>
+                        <select
+                          value={fileType}
+                          onChange={(e) =>
+                            setFileType(e.target.value as FileType)
+                          }
                           onClick={(e) => e.stopPropagation()}
-                          className="h-8 w-8 rounded cursor-pointer"
-                        />
+                          className="block w-24 px-3 py-1.5 text-sm border-2 border-gray-600 rounded-lg bg-gray-700 text-gray-200 focus:outline-hidden focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200"
+                        >
+                          <option value="tsx">TSX</option>
+                          <option value="jsx">JSX</option>
+                        </select>
+                      </div>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          copyToClipboard();
+                        }}
+                        className="inline-flex items-center px-3 py-1.5 border border-transparent text-sm font-medium rounded-md shadow-xs text-white bg-blue-600 hover:bg-blue-700 focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-200"
+                      >
+                        <svg
+                          className="h-4 w-4 mr-2"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                          stroke="currentColor"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"
+                          />
+                        </svg>
+                        Copy Code
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="mb-4 shrink-0">
+                    <label
+                      htmlFor="componentName"
+                      className="block text-sm font-medium text-gray-200 mb-2"
+                    >
+                      Component Name
+                    </label>
+                    <div className="relative rounded-md shadow-xs">
+                      <input
+                        type="text"
+                        id="componentName"
+                        value={componentName}
+                        onChange={handleComponentNameChange}
+                        onClick={(e) => e.stopPropagation()}
+                        className="block w-full px-3 py-1.5 text-sm border-2 border-gray-600 rounded-lg bg-gray-700 text-gray-200 focus:outline-hidden focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200"
+                        placeholder="Enter component name"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="mb-4 shrink-0">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label
+                          htmlFor="previewColor"
+                          className="block text-sm font-medium text-gray-200 mb-2"
+                        >
+                          Color
+                        </label>
+                        <div className="flex items-center space-x-2">
+                          <input
+                            type="color"
+                            id="previewColor"
+                            value={previewColor}
+                            onChange={(e) => setPreviewColor(e.target.value)}
+                            onClick={(e) => e.stopPropagation()}
+                            className="h-8 w-8 rounded cursor-pointer"
+                          />
+                          <input
+                            type="text"
+                            value={previewColor}
+                            onChange={(e) => setPreviewColor(e.target.value)}
+                            onClick={(e) => e.stopPropagation()}
+                            className="block w-full px-3 py-1.5 text-sm border-2 border-gray-600 rounded-lg bg-gray-700 text-gray-200 focus:outline-hidden focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200"
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <label
+                          htmlFor="previewSize"
+                          className="block text-sm font-medium text-gray-200 mb-2"
+                        >
+                          Size (px)
+                        </label>
                         <input
-                          type="text"
-                          value={previewColor}
-                          onChange={(e) => setPreviewColor(e.target.value)}
+                          type="number"
+                          id="previewSize"
+                          value={previewSize}
+                          onChange={(e) =>
+                            setPreviewSize(Number(e.target.value))
+                          }
                           onClick={(e) => e.stopPropagation()}
+                          min="10"
+                          max="500"
                           className="block w-full px-3 py-1.5 text-sm border-2 border-gray-600 rounded-lg bg-gray-700 text-gray-200 focus:outline-hidden focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200"
                         />
                       </div>
                     </div>
-                    <div>
-                      <label
-                        htmlFor="previewSize"
-                        className="block text-sm font-medium text-gray-200 mb-2"
-                      >
-                        Size (px)
-                      </label>
-                      <input
-                        type="number"
-                        id="previewSize"
-                        value={previewSize}
-                        onChange={(e) => setPreviewSize(Number(e.target.value))}
-                        onClick={(e) => e.stopPropagation()}
-                        min="10"
-                        max="500"
-                        className="block w-full px-3 py-1.5 text-sm border-2 border-gray-600 rounded-lg bg-gray-700 text-gray-200 focus:outline-hidden focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200"
+                  </div>
+
+                  <div className="mb-4 shrink-0">
+                    <h3 className="text-sm font-medium text-gray-200 mb-2">
+                      Preview
+                    </h3>
+                    <div className="max-h-[200px] overflow-auto">
+                      <Preview
+                        svgContent={svgContent}
+                        color={previewColor}
+                        size={previewSize}
                       />
                     </div>
                   </div>
-                </div>
 
-                <div className="mb-4 shrink-0">
-                  <h3 className="text-sm font-medium text-gray-200 mb-2">
-                    Preview
-                  </h3>
-                  <div className="max-h-[200px] overflow-auto">
-                    <Preview
-                      svgContent={svgContent}
-                      color={previewColor}
-                      size={previewSize}
-                    />
+                  <div className="rounded-lg overflow-hidden bg-gray-900 flex-1 min-h-0">
+                    <div className="h-full overflow-y-auto scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-gray-800 hover:scrollbar-thumb-gray-500">
+                      <CodeBlock code={reactCode} language={fileType} />
+                    </div>
                   </div>
                 </div>
-
-                <div className="rounded-lg overflow-hidden bg-gray-900 flex-1 min-h-0">
-                  <div className="h-full overflow-y-auto scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-gray-800 hover:scrollbar-thumb-gray-500">
-                    <CodeBlock code={reactCode} language={fileType} />
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
+              )}
+            </div>
           </div>
         )}
       </div>
