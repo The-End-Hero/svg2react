@@ -1,6 +1,8 @@
-# CI uses pnpm latest (v11+), which blocks unreviewed dependency build scripts by default.
+# pnpm v11 blocks unreviewed dependency build scripts by default (strictDepBuilds).
 # esbuild must run its install script to fetch the platform binary; the others are safe to deny.
 allowBuilds:
   esbuild: true
   core-js: false
   es5-ext: false
+
+minimumReleaseAge: 1440

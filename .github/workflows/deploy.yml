@@ -17,17 +17,16 @@ jobs:
       - name: Install pnpm
         uses: pnpm/action-setup@v6
         with:
-          # Pin major to avoid CI breaks from pnpm 11+ strictDepBuilds defaults.
-          # allowBuilds in pnpm-workspace.yaml keeps installs safe when upgrading later.
-          version: 10
+          version: 11
 
       - name: Setup Node.js
         uses: actions/setup-node@v7
         with:
           node-version: "24"
+          cache: pnpm
 
       - name: Install dependencies
-        run: pnpm install
+        run: pnpm install --frozen-lockfile
 
       - name: Build project
         run: pnpm run build
