@@ -1,527 +1,1001 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useDropzone } from "react-dropzone";
 import clsx from "clsx";
 import toast, { Toaster } from "react-hot-toast";
-import { Highlight, themes } from "prism-react-renderer";
+import { AnimatePresence, motion } from "motion/react";
 import { posthog } from "posthog-js";
-// import {
-//   convertToReactComponent,
-//   formatSvg,
-//   type FileType,
-// } from "./svgConverter.utils";
 import {
   convertToReactComponent,
   formatSvg,
   type FileType,
 } from "@xiping/svg-to-react";
+import { CodeBlock } from "./CodeBlock";
+import { SvgPreview } from "./SvgPreview";
+import { samples, type SvgSample } from "./samples";
+import {
+  fileNameToComponentName,
+  formatBytes,
+  normalizeComponentName,
+  prepareSvg,
+  prettyPrintSvg,
+  type PreparedSvg,
+} from "./svg";
+import {
+  CheckIcon,
+  ClipboardIcon,
+  CodeIcon,
+  CopyIcon,
+  FileCodeIcon,
+  GithubIcon,
+  GridIcon,
+  ImageIcon,
+  LockIcon,
+  LogoMark,
+  MinusIcon,
+  PlusIcon,
+  SparklesIcon,
+  UploadIcon,
+  XIcon,
+} from "./icons";
 
-interface PreviewProps {
-  svgContent: string;
-  color: string;
-  size: number;
+const MIN_SIZE = 16;
+const MAX_SIZE = 512;
+const DEFAULT_SIZE = 120;
+const MAX_FILE_SIZE = 2 * 1024 * 1024;
+
+type View = "component" | "source";
+
+const TABS: { id: View; label: string }[] = [
+  { id: "component", label: "Component" },
+  { id: "source", label: "SVG source" },
+];
+
+const FEATURES = [
+  {
+    icon: CodeIcon,
+    title: "Typed output",
+    body: "TSX or JSX, ready to drop into your app.",
+  },
+  {
+    icon: SparklesIcon,
+    title: "SVGO clean",
+    body: "Paths optimized, attributes normalized.",
+  },
+  {
+    icon: LockIcon,
+    title: "Private by default",
+    body: "Conversion runs locally, not on a server.",
+  },
+] as const;
+
+function clampSize(value: number): number {
+  if (!Number.isFinite(value)) {
+    return DEFAULT_SIZE;
+  }
+
+  return Math.min(MAX_SIZE, Math.max(MIN_SIZE, Math.round(value)));
 }
-
-interface UploadZoneProps {
-  title: string;
-  subtitle: string;
-  hint?: string;
-  isDragActive: boolean;
-  onOpen: () => void;
-  className?: string;
-}
-
-const UploadZone = ({
-  title,
-  subtitle,
-  hint,
-  isDragActive,
-  onOpen,
-  className,
-}: UploadZoneProps) => {
-  return (
-    <button
-      type="button"
-      onClick={onOpen}
-      onKeyDown={(e) => {
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault();
-          onOpen();
-        }
-      }}
-      className={clsx(
-        "w-full rounded-xl border-2 border-dashed px-4 py-6 text-center transition-colors duration-200",
-        isDragActive
-          ? "border-blue-400 bg-blue-500/10"
-          : "border-gray-600 bg-gray-800/50 hover:border-gray-500",
-        className,
-      )}
-    >
-      <p className="text-sm md:text-base font-medium text-gray-100">{title}</p>
-      <p className="text-xs md:text-sm text-gray-300 mt-2">{subtitle}</p>
-      {hint && <p className="text-xs text-gray-400 mt-2">{hint}</p>}
-    </button>
-  );
-};
-
-const Preview = ({ svgContent, color, size }: PreviewProps) => {
-  // 创建一个临时的 DOM 元素来解析 SVG
-  const parser = new DOMParser();
-  const doc = parser.parseFromString(svgContent, "image/svg+xml");
-  const svgElement = doc.documentElement;
-
-  // 设置 SVG 的宽度和高度
-  svgElement.setAttribute("width", `${size}`);
-  svgElement.setAttribute("height", `${size}`);
-
-  // 处理内部元素的颜色，保持原有的空心/实心特性
-  const elements = svgElement.getElementsByTagName("*");
-  for (let i = 0; i < elements.length; i++) {
-    const element = elements[i];
-    const originalFill = element.getAttribute("fill");
-    const originalStroke = element.getAttribute("stroke");
-
-    // 只有当元素原本有颜色时才设置新颜色，保持none值不变
-    if (originalFill && originalFill !== "none") {
-      element.setAttribute("fill", color);
-    }
-    if (originalStroke && originalStroke !== "none") {
-      element.setAttribute("stroke", color);
-    }
-  }
-
-  // 设置根SVG元素的默认颜色（如果没有子元素设置的话）
-  // 只有当根元素没有fill属性，或者fill不是none时才设置默认颜色
-  const rootFill = svgElement.getAttribute("fill");
-  if (!rootFill || (rootFill && rootFill !== "none")) {
-    svgElement.setAttribute("fill", color);
-  }
-
-  const rootStroke = svgElement.getAttribute("stroke");
-  if (!rootStroke || (rootStroke && rootStroke !== "none")) {
-    svgElement.setAttribute("stroke", color);
-  }
-
-  return (
-    <div className="relative border border-gray-700 rounded-lg p-6 bg-white">
-      <div
-        className="absolute inset-0"
-        style={{
-          backgroundImage: `linear-gradient(45deg, #f3f4f6 25%, transparent 25%),
-            linear-gradient(-45deg, #f3f4f6 25%, transparent 25%),
-            linear-gradient(45deg, transparent 75%, #f3f4f6 75%),
-            linear-gradient(-45deg, transparent 75%, #f3f4f6 75%)`,
-          backgroundSize: "20px 20px",
-          backgroundPosition: "0 0, 0 10px, 10px -10px, -10px 0px",
-          opacity: 0.1,
-        }}
-      />
-      <div
-        className="relative flex items-center justify-center min-h-[80px]"
-        dangerouslySetInnerHTML={{ __html: svgElement.outerHTML }}
-      />
-    </div>
-  );
-};
-
-const CodeBlock = ({ code, language }: { code: string; language: string }) => {
-  return (
-    <div className="relative w-full overflow-x-auto scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-gray-800 hover:scrollbar-thumb-gray-500">
-      <div className="min-w-full inline-block">
-        <Highlight
-          theme={themes.nightOwl}
-          code={code.trim()}
-          language={language}
-        >
-          {({ className, style, tokens, getLineProps, getTokenProps }) => (
-            <pre className={className} style={{ ...style, margin: 0 }}>
-              {tokens.map((line, i) => (
-                <div key={i} {...getLineProps({ line })} className="table-row">
-                  <span className="table-cell text-right pr-4 select-none text-gray-500 w-8">
-                    {i + 1}
-                  </span>
-                  <span className="table-cell whitespace-pre-wrap break-words max-w-[800px]">
-                    {line.map((token, key) => (
-                      <span key={key} {...getTokenProps({ token })} />
-                    ))}
-                  </span>
-                </div>
-              ))}
-            </pre>
-          )}
-        </Highlight>
-      </div>
-    </div>
-  );
-};
-
-const SvgPreview = ({ svgContent }: { svgContent: string }) => {
-  return (
-    <div className="relative border border-gray-700 rounded-lg p-6 bg-white">
-      <div
-        className="absolute inset-0"
-        style={{
-          backgroundImage: `linear-gradient(45deg, #f3f4f6 25%, transparent 25%),
-            linear-gradient(-45deg, #f3f4f6 25%, transparent 25%),
-            linear-gradient(45deg, transparent 75%, #f3f4f6 75%),
-            linear-gradient(-45deg, transparent 75%, #f3f4f6 75%)`,
-          backgroundSize: "20px 20px",
-          backgroundPosition: "0 0, 0 10px, 10px -10px, -10px 0px",
-          opacity: 0.1,
-        }}
-      />
-      <div
-        className="relative flex items-center justify-center min-h-[80px]"
-        dangerouslySetInnerHTML={{ __html: svgContent }}
-      />
-    </div>
-  );
-};
 
 export default function SvgConverter() {
-  const [svgContent, setSvgContent] = useState<string>("");
-  const [error, setError] = useState<string>("");
-  const [componentName, setComponentName] = useState<string>("SvgComponent");
+  const [svgContent, setSvgContent] = useState("");
+  const [fileName, setFileName] = useState("");
+  const [fileSize, setFileSize] = useState(0);
+  const [componentName, setComponentName] = useState("SvgComponent");
   const [fileType, setFileType] = useState<FileType>("tsx");
-  const [previewColor, setPreviewColor] = useState<string>("#000000");
-  const [previewSize, setPreviewSize] = useState<number>(100);
+  const [tint, setTint] = useState<string | null>(null);
+  const [size, setSize] = useState(DEFAULT_SIZE);
+  const [showGrid, setShowGrid] = useState(true);
+  const [view, setView] = useState<View>("component");
+  const [copiedKey, setCopiedKey] = useState<string | null>(null);
+  const copyTimer = useRef<number | null>(null);
+
+  const copyKey = `${view}:${fileType}`;
+  const copied = copiedKey === copyKey;
+
+  const safeComponentName = useMemo(
+    () => normalizeComponentName(componentName),
+    [componentName],
+  );
+
+  const preview = useMemo(() => {
+    if (!svgContent) {
+      return null;
+    }
+
+    try {
+      return prepareSvg(svgContent, size, tint);
+    } catch {
+      return null;
+    }
+  }, [size, svgContent, tint]);
 
   const reactCode = useMemo(() => {
-    if (!svgContent) return "";
-    return convertToReactComponent(svgContent, componentName, fileType);
-  }, [fileType, svgContent, componentName]);
-
-  const onDrop = useCallback(async (acceptedFiles: File[]) => {
-    try {
-      setError("");
-      const file = acceptedFiles[0];
-      if (!file) return;
-
-      const fileName = file.name.replace(/\.svg$/i, "");
-      posthog.capture("drop svg file", { filename: fileName });
-      const pascalCaseName = fileName
-        .split(/[-_\s]/)
-        .map(
-          (word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase(),
-        )
-        .join("");
-      const newComponentName = pascalCaseName || "SvgComponent";
-      setComponentName(newComponentName);
-
-      const text = await file.text();
-
-      // 格式化 SVG 内容
-      const formattedSvg = formatSvg(text);
-      setSvgContent(formattedSvg);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Conversion failed");
+    if (!svgContent) {
+      return "";
     }
-  }, []);
+
+    try {
+      return convertToReactComponent(svgContent, safeComponentName, fileType);
+    } catch {
+      return "";
+    }
+  }, [fileType, safeComponentName, svgContent]);
+
+  const sourceCode = useMemo(
+    () => (svgContent ? prettyPrintSvg(svgContent) : ""),
+    [svgContent],
+  );
+  const activeCode = view === "component" ? reactCode : sourceCode;
+  const lineCount = useMemo(
+    () => (activeCode ? activeCode.trim().split("\n").length : 0),
+    [activeCode],
+  );
+
+  const loadSvg = useCallback(
+    (content: string, name: string, bytes: number) => {
+      const formatted = formatSvg(content);
+      prepareSvg(formatted, DEFAULT_SIZE, null);
+
+      setSvgContent(formatted);
+      setFileName(name);
+      setFileSize(bytes);
+      setComponentName(fileNameToComponentName(name));
+      setTint(null);
+      setView("component");
+      setSize(DEFAULT_SIZE);
+      setCopiedKey(null);
+    },
+    [],
+  );
+
+  const onDrop = useCallback(
+    async (acceptedFiles: File[]) => {
+      const file = acceptedFiles[0];
+
+      if (!file) {
+        return;
+      }
+
+      try {
+        const text = await file.text();
+        loadSvg(text, file.name, file.size);
+        posthog.capture("drop svg file", { size: file.size });
+      } catch (error) {
+        toast.error(
+          error instanceof Error ? error.message : "Could not read that SVG.",
+        );
+      }
+    },
+    [loadSvg],
+  );
 
   const { getRootProps, getInputProps, isDragActive, open } = useDropzone({
     onDrop,
+    onDropRejected: (rejections) => {
+      const firstError = rejections[0]?.errors[0];
+
+      if (firstError?.code === "file-too-large") {
+        toast.error("Keep SVGs under 2 MB.");
+      } else {
+        toast.error("Only .svg files are supported.");
+      }
+    },
     accept: {
       "image/svg+xml": [".svg"],
     },
     multiple: false,
     noClick: true,
+    noKeyboard: true,
+    maxSize: MAX_FILE_SIZE,
   });
 
-  const copyToClipboard = async () => {
+  const loadPastedText = useCallback(
+    (text: string) => {
+      if (!/<svg[\s>]/i.test(text)) {
+        return false;
+      }
+
+      loadSvg(text, "pasted.svg", new TextEncoder().encode(text).length);
+      posthog.capture("paste svg");
+      return true;
+    },
+    [loadSvg],
+  );
+
+  useEffect(() => {
+    const handlePaste = (event: ClipboardEvent) => {
+      if (
+        event.target instanceof HTMLElement &&
+        event.target.closest("input, textarea, [contenteditable='true']")
+      ) {
+        return;
+      }
+
+      const text = event.clipboardData?.getData("text/plain") ?? "";
+
+      if (!/<svg[\s>]/i.test(text)) {
+        return;
+      }
+
+      event.preventDefault();
+
+      try {
+        loadPastedText(text);
+      } catch (error) {
+        toast.error(
+          error instanceof Error
+            ? error.message
+            : "That text isn't a valid SVG.",
+        );
+      }
+    };
+
+    window.addEventListener("paste", handlePaste);
+    return () => window.removeEventListener("paste", handlePaste);
+  }, [loadPastedText]);
+
+  useEffect(
+    () => () => {
+      if (copyTimer.current) {
+        window.clearTimeout(copyTimer.current);
+      }
+    },
+    [],
+  );
+
+  const pasteFromClipboard = async () => {
     try {
-      await navigator.clipboard.writeText(reactCode);
-      toast.success("Code copied to clipboard!");
-    } catch (e) {
-      console.log(e);
+      const text = await navigator.clipboard.readText();
+
+      if (!loadPastedText(text)) {
+        toast.error("Your clipboard doesn't contain an SVG.");
+      }
+    } catch {
+      toast.error("Clipboard access was blocked.");
     }
   };
 
-  const handleComponentNameChange = (
-    e: React.ChangeEvent<HTMLInputElement>,
-  ) => {
-    const newName = e.target.value;
-    setComponentName(newName);
+  const copyToClipboard = async () => {
+    const code = activeCode.trim();
+
+    if (!code) {
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(code);
+      setCopiedKey(copyKey);
+      posthog.capture("copy code", {
+        type: view === "component" ? fileType : "svg",
+      });
+
+      if (copyTimer.current) {
+        window.clearTimeout(copyTimer.current);
+      }
+
+      copyTimer.current = window.setTimeout(() => setCopiedKey(null), 1800);
+    } catch {
+      toast.error("Couldn't copy to the clipboard.");
+    }
   };
 
-  const openGithub = () => {
-    window.open("https://github.com/The-End-Hero/svg2react", "_blank");
+  const reset = () => {
+    setSvgContent("");
+    setFileName("");
+    setFileSize(0);
+    setComponentName("SvgComponent");
+    setTint(null);
+    setView("component");
+    setSize(DEFAULT_SIZE);
+    setShowGrid(true);
+    setCopiedKey(null);
+  };
+
+  const handleSample = (sample: SvgSample) => {
+    try {
+      loadSvg(
+        sample.svg,
+        sample.fileName,
+        new TextEncoder().encode(sample.svg).length,
+      );
+      posthog.capture("load sample", { name: sample.id });
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Could not load that sample.",
+      );
+    }
   };
 
   return (
     <div
-      {...getRootProps()}
-      className={clsx(
-        "h-screen bg-gray-900 flex flex-col transition-all duration-200 ease-in-out",
-        isDragActive && "bg-gray-800",
-      )}
+      {...getRootProps({ tabIndex: -1 })}
+      className="relative flex min-h-screen flex-col bg-ink-950 text-fg lg:h-screen lg:overflow-hidden"
     >
       <input {...getInputProps()} />
-      <Toaster />
-      <div className="flex-1 flex flex-col p-4 md:p-6 overflow-hidden">
-        <div className="text-center mb-4 md:mb-6">
-          <div className="flex items-center justify-center gap-4">
-            <h1 className="text-2xl md:text-3xl font-extrabold text-white tracking-tight">
-              SVG to React Component
-            </h1>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                openGithub();
-              }}
-              className="inline-flex items-center px-3 py-1.5 border border-transparent text-sm font-medium rounded-md shadow-xs text-white bg-gray-700 hover:bg-gray-600 focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 transition-colors duration-200"
-            >
-              <svg
-                className="h-5 w-5 mr-2"
-                fill="currentColor"
-                viewBox="0 0 24 24"
-                aria-hidden="true"
-              >
-                <path
-                  fillRule="evenodd"
-                  d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"
-                  clipRule="evenodd"
-                />
-              </svg>
-              GitHub
-            </button>
-          </div>
-          <p className="text-sm md:text-base text-gray-400 mt-1">
-            Transform your SVG files into reusable React components
-          </p>
+
+      <Toaster
+        position="bottom-right"
+        toastOptions={{
+          duration: 3200,
+          style: {
+            background: "#15151a",
+            color: "#f2f2f5",
+            border: "1px solid rgba(255,255,255,0.08)",
+            borderRadius: "12px",
+            boxShadow: "0 18px 48px -16px rgba(0,0,0,0.85)",
+            fontSize: "12.5px",
+            padding: "10px 12px",
+          },
+          success: {
+            iconTheme: { primary: "#8b7cff", secondary: "#15151a" },
+          },
+          error: {
+            iconTheme: { primary: "#ff6b6b", secondary: "#15151a" },
+          },
+        }}
+      />
+
+      <div className="pointer-events-none absolute inset-x-0 top-0 z-0 h-[420px] bg-[radial-gradient(ellipse_at_50%_-20%,rgba(139,124,255,0.14),transparent_62%)]" />
+      <div className="pointer-events-none absolute inset-x-0 top-0 z-10 h-px bg-gradient-to-r from-transparent via-accent/40 to-transparent" />
+
+      <Header hasSvg={Boolean(svgContent)} onReset={reset} />
+
+      <AnimatePresence>{isDragActive && <DropOverlay />}</AnimatePresence>
+
+      <main className="relative z-10 flex-1 lg:min-h-0">
+        {svgContent ? (
+          <Workspace
+            key="workspace"
+            preview={preview}
+            fileName={fileName}
+            fileSize={fileSize}
+            tint={tint}
+            size={size}
+            showGrid={showGrid}
+            componentName={componentName}
+            fileType={fileType}
+            view={view}
+            code={activeCode}
+            lineCount={lineCount}
+            copied={copied}
+            onOpen={open}
+            onTintChange={setTint}
+            onSizeChange={setSize}
+            onToggleGrid={() => setShowGrid((value) => !value)}
+            onRemove={reset}
+            onComponentNameChange={setComponentName}
+            onFileTypeChange={setFileType}
+            onViewChange={setView}
+            onCopy={copyToClipboard}
+          />
+        ) : (
+          <EmptyState
+            key="empty"
+            isDragActive={isDragActive}
+            onOpen={open}
+            onPaste={pasteFromClipboard}
+            onSample={handleSample}
+          />
+        )}
+      </main>
+    </div>
+  );
+}
+
+function Header({ hasSvg, onReset }: { hasSvg: boolean; onReset: () => void }) {
+  return (
+    <header className="sticky top-0 z-20 flex h-14 shrink-0 items-center justify-between border-b border-line bg-ink-950/70 px-4 backdrop-blur-xl sm:px-6">
+      <div className="flex items-center gap-3">
+        <span className="flex h-8 w-8 items-center justify-center rounded-lg border border-accent/20 bg-accent/10 text-accent shadow-[0_0_24px_-8px_rgba(139,124,255,0.7)]">
+          <LogoMark className="h-4 w-4" />
+        </span>
+        <div className="flex items-center gap-2">
+          <span className="text-[13px] font-semibold tracking-tight text-fg">
+            SVG<span className="text-accent">2</span>React
+          </span>
+          <span className="hidden rounded-full border border-line px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-[0.14em] text-fg-subtle sm:inline">
+            beta
+          </span>
+        </div>
+      </div>
+
+      <div className="flex items-center gap-1.5">
+        {hasSvg && (
+          <button
+            type="button"
+            onClick={onReset}
+            aria-label="Start a new conversion"
+            className="inline-flex h-8 items-center gap-1.5 rounded-lg px-2.5 text-[11.5px] font-medium text-fg-muted transition-colors hover:bg-white/[0.05] hover:text-fg"
+          >
+            <PlusIcon className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline">New</span>
+          </button>
+        )}
+
+        <a
+          href="https://github.com/The-End-Hero/svg2react"
+          target="_blank"
+          rel="noreferrer"
+          aria-label="Open the SVG2React GitHub repository"
+          className="inline-flex h-8 items-center gap-2 rounded-lg border border-line bg-white/[0.02] px-2.5 text-[11.5px] font-medium text-fg-muted transition-colors hover:border-line-strong hover:bg-white/[0.05] hover:text-fg"
+        >
+          <GithubIcon className="h-3.5 w-3.5" />
+          <span className="hidden sm:inline">GitHub</span>
+        </a>
+      </div>
+    </header>
+  );
+}
+
+function DropOverlay() {
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.15 }}
+      className="pointer-events-none fixed inset-0 z-50 flex items-center justify-center bg-ink-950/75 backdrop-blur-md"
+    >
+      <div className="absolute inset-3 rounded-2xl border border-dashed border-accent/40" />
+      <div className="flex flex-col items-center gap-3">
+        <span className="flex h-14 w-14 items-center justify-center rounded-2xl border border-accent/30 bg-accent/10 text-accent shadow-[0_0_48px_-10px_rgba(139,124,255,0.8)]">
+          <UploadIcon className="h-6 w-6" />
+        </span>
+        <p className="text-[15px] font-medium text-fg">Drop to convert</p>
+        <p className="text-[11.5px] text-fg-muted">SVG only · up to 2 MB</p>
+      </div>
+    </motion.div>
+  );
+}
+
+function EmptyState({
+  isDragActive,
+  onOpen,
+  onPaste,
+  onSample,
+}: {
+  isDragActive: boolean;
+  onOpen: () => void;
+  onPaste: () => void;
+  onSample: (sample: SvgSample) => void;
+}) {
+  return (
+    <section className="dark-scroll flex min-h-[calc(100vh-3.5rem)] overflow-y-auto px-4 py-12 sm:px-6 lg:h-full lg:min-h-0">
+      <div className="m-auto w-full max-w-[760px]">
+        <div className="mb-7 flex justify-center">
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-line bg-white/[0.02] px-3 py-1 text-[10.5px] text-fg-muted">
+            <LockIcon className="h-3 w-3 text-accent/80" />
+            100% local · your SVG is processed in the browser
+          </span>
         </div>
 
-        {!svgContent && (
-          <div className="flex-1 flex flex-col items-center justify-center">
-            <div className="w-full max-w-2xl space-y-4">
-              <svg
-                className="mx-auto h-16 w-16 text-gray-400"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
+        <h1 className="text-center text-[38px] leading-[1.02] font-semibold tracking-[-0.045em] text-fg sm:text-[52px]">
+          SVG in.{" "}
+          <span className="bg-gradient-to-br from-accent-soft to-accent bg-clip-text text-transparent">
+            React
+          </span>{" "}
+          out.
+        </h1>
+
+        <p className="mx-auto mt-4 max-w-[500px] text-center text-[13.5px] leading-6 text-fg-muted sm:text-[14.5px]">
+          Drop an SVG and get a clean, typed React component — optimized paths,
+          sensible props, no cleanup.
+        </p>
+
+        <div className="mt-9">
+          <button
+            type="button"
+            onClick={onOpen}
+            className={clsx(
+              "group relative flex w-full flex-col items-center justify-center rounded-2xl border border-dashed px-6 py-11 text-center transition-all duration-200",
+              isDragActive
+                ? "border-accent/60 bg-accent/[0.06]"
+                : "border-white/[0.12] bg-white/[0.015] hover:border-accent/35 hover:bg-white/[0.03]",
+            )}
+          >
+            <span className="mb-5 flex h-12 w-12 items-center justify-center rounded-xl border border-line bg-ink-800 text-accent shadow-[0_12px_32px_-16px_rgba(139,124,255,0.8)] transition-transform duration-200 group-hover:-translate-y-0.5">
+              <UploadIcon className="h-5 w-5" />
+            </span>
+            <span className="text-[15px] font-medium text-fg">
+              Drop your SVG here
+            </span>
+            <span className="mt-1.5 text-[12.5px] text-fg-muted">
+              or click to browse — .svg up to 2 MB
+            </span>
+          </button>
+
+          <div className="mt-3 flex items-center justify-center gap-2 text-[11px] text-fg-subtle">
+            <button
+              type="button"
+              onClick={onPaste}
+              className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 transition-colors hover:bg-white/[0.04] hover:text-fg-muted"
+            >
+              <ClipboardIcon className="h-3 w-3" />
+              Paste from clipboard
+            </button>
+            <span className="text-white/15">·</span>
+            <span className="font-mono text-[10px]">Ctrl/⌘ V</span>
+          </div>
+        </div>
+
+        <div className="mt-7 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
+          <span className="text-[10px] font-medium uppercase tracking-[0.14em] text-fg-subtle">
+            Try a sample
+          </span>
+          <div className="flex flex-wrap justify-center gap-2">
+            {samples.map((sample) => (
+              <button
+                key={sample.id}
+                type="button"
+                onClick={() => onSample(sample)}
+                className="group inline-flex items-center gap-2 rounded-lg border border-line bg-white/[0.02] py-1.5 pr-3 pl-1.5 text-[11.5px] font-medium text-fg-muted transition-colors hover:border-accent/30 hover:bg-accent/[0.06] hover:text-fg"
               >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
-                />
-              </svg>
-              <UploadZone
-                title={
-                  isDragActive
-                    ? "Drop your SVG file to upload"
-                    : "Click to choose an SVG file"
+                <span className="flex h-7 w-7 items-center justify-center rounded-md bg-white/[0.04] text-fg transition-colors group-hover:bg-white/[0.07]">
+                  <span
+                    className="block h-4 w-4 [&>svg]:h-full [&>svg]:w-full"
+                    dangerouslySetInnerHTML={{ __html: sample.svg }}
+                  />
+                </span>
+                {sample.name}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="mt-10 grid grid-cols-1 gap-2.5 sm:grid-cols-3">
+          {FEATURES.map((feature) => {
+            const FeatureIcon = feature.icon;
+
+            return (
+              <div
+                key={feature.title}
+                className="flex items-start gap-3 rounded-xl border border-line bg-white/[0.015] p-3.5"
+              >
+                <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-line bg-ink-800 text-fg-muted">
+                  <FeatureIcon className="h-3.5 w-3.5" />
+                </span>
+                <div>
+                  <p className="text-[12px] font-medium text-fg">
+                    {feature.title}
+                  </p>
+                  <p className="mt-1 text-[11px] leading-4 text-fg-subtle">
+                    {feature.body}
+                  </p>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+interface WorkspaceProps {
+  preview: PreparedSvg | null;
+  fileName: string;
+  fileSize: number;
+  tint: string | null;
+  size: number;
+  showGrid: boolean;
+  componentName: string;
+  fileType: FileType;
+  view: View;
+  code: string;
+  lineCount: number;
+  copied: boolean;
+  onOpen: () => void;
+  onTintChange: (value: string | null) => void;
+  onSizeChange: (value: number) => void;
+  onToggleGrid: () => void;
+  onRemove: () => void;
+  onComponentNameChange: (value: string) => void;
+  onFileTypeChange: (value: FileType) => void;
+  onViewChange: (value: View) => void;
+  onCopy: () => void;
+}
+
+function Workspace({
+  preview,
+  fileName,
+  fileSize,
+  tint,
+  size,
+  showGrid,
+  componentName,
+  fileType,
+  view,
+  code,
+  lineCount,
+  copied,
+  onOpen,
+  onTintChange,
+  onSizeChange,
+  onToggleGrid,
+  onRemove,
+  onComponentNameChange,
+  onFileTypeChange,
+  onViewChange,
+  onCopy,
+}: WorkspaceProps) {
+  return (
+    <section className="flex flex-col p-3 sm:p-4 lg:h-full lg:min-h-0">
+      <div className="grid min-h-0 flex-1 grid-cols-1 overflow-hidden rounded-2xl border border-line bg-ink-900/70 shadow-[0_32px_100px_-48px_rgba(0,0,0,0.9)] lg:grid-cols-[minmax(0,1.08fr)_minmax(0,1fr)]">
+        <section className="flex min-h-[440px] flex-col border-b border-line lg:min-h-0 lg:border-r lg:border-b-0">
+          <div className="flex min-h-14 shrink-0 flex-wrap items-center justify-between gap-2 border-b border-line px-3 py-2">
+            <div className="flex items-center gap-2">
+              <ImageIcon className="h-3.5 w-3.5 text-fg-subtle" />
+              <span className="hidden text-[10px] font-medium tracking-[0.14em] text-fg-muted uppercase sm:inline">
+                Preview
+              </span>
+              <span className="hidden items-center gap-1 text-[9.5px] text-fg-subtle sm:flex">
+                <span className="h-1 w-1 rounded-full bg-accent motion-safe:animate-pulse" />
+                Live
+              </span>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-1 sm:gap-1.5">
+              <TintControl value={tint} onChange={onTintChange} />
+              <SizeControl
+                key={fileName}
+                value={size}
+                onChange={onSizeChange}
+              />
+
+              <button
+                type="button"
+                onClick={onToggleGrid}
+                aria-pressed={showGrid}
+                aria-label="Toggle canvas grid"
+                title="Toggle canvas grid"
+                className={clsx(
+                  "flex h-8 w-8 items-center justify-center rounded-md transition-colors",
+                  showGrid
+                    ? "bg-white/[0.06] text-fg"
+                    : "text-fg-subtle hover:bg-white/[0.04] hover:text-fg-muted",
+                )}
+              >
+                <GridIcon className="h-3.5 w-3.5" />
+              </button>
+
+              <span className="mx-0.5 hidden h-4 w-px bg-line sm:block" />
+
+              <button
+                type="button"
+                onClick={onOpen}
+                aria-label="Replace SVG"
+                className="inline-flex h-8 items-center gap-1.5 rounded-md px-2 text-[10.5px] font-medium text-fg-muted transition-colors hover:bg-white/[0.05] hover:text-fg"
+              >
+                <UploadIcon className="h-3 w-3" />
+                <span className="hidden sm:inline">Replace</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={onRemove}
+                aria-label="Remove SVG"
+                title="Remove SVG"
+                className="flex h-8 w-8 items-center justify-center rounded-md text-fg-subtle transition-colors hover:bg-danger/10 hover:text-danger"
+              >
+                <XIcon className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          </div>
+
+          <div className="flex min-h-0 flex-1 flex-col p-3 sm:p-4">
+            <div className="relative min-h-0 flex-1">
+              <div
+                className={clsx(
+                  "light-scroll canvas-surface absolute inset-0 flex overflow-auto rounded-xl",
+                  showGrid && "canvas-grid",
+                )}
+              >
+                {preview ? (
+                  <div className="m-auto flex flex-col items-center gap-4 p-6 sm:p-10">
+                    <div className="rounded-lg border border-dashed border-black/[0.14] p-4">
+                      <SvgPreview
+                        markup={preview.markup}
+                        width={preview.width}
+                        height={preview.height}
+                      />
+                    </div>
+                    <span className="rounded-full border border-black/[0.06] bg-black/[0.03] px-2.5 py-1 font-mono text-[9.5px] tabular-nums text-black/50">
+                      {preview.width} × {preview.height} px
+                    </span>
+                  </div>
+                ) : (
+                  <div className="m-auto p-8 text-center text-[12px] text-black/50">
+                    Couldn't render this SVG.
+                  </div>
+                )}
+              </div>
+
+              <span className="pointer-events-none absolute top-3 left-3 z-20 font-mono text-[9px] tracking-[0.14em] text-black/45 uppercase">
+                Canvas
+              </span>
+              <span
+                className="pointer-events-none absolute top-3 right-3 z-20 max-w-[45%] truncate font-mono text-[9px] text-black/55"
+                title={fileName}
+              >
+                {fileName}
+              </span>
+            </div>
+
+            <div className="mt-2 flex shrink-0 items-center justify-between gap-3 px-0.5 text-[10px] text-fg-subtle">
+              <span className="truncate font-mono">
+                {preview?.viewBox ? `viewBox ${preview.viewBox}` : "No viewBox"}
+              </span>
+              <span className="flex shrink-0 items-center gap-2">
+                {fileSize > 0 && (
+                  <span className="tabular-nums">{formatBytes(fileSize)}</span>
+                )}
+                {fileSize > 0 && <span className="h-2.5 w-px bg-line" />}
+                <span className="inline-flex items-center gap-1">
+                  <LockIcon className="h-2.5 w-2.5" />
+                  Local only
+                </span>
+              </span>
+            </div>
+          </div>
+        </section>
+
+        <section className="flex min-h-[520px] flex-col lg:min-h-0">
+          <div className="flex min-h-14 shrink-0 flex-wrap items-center justify-between gap-2 border-b border-line px-3 py-2">
+            <div className="flex min-w-0 items-center gap-2">
+              <FileCodeIcon className="hidden h-3.5 w-3.5 shrink-0 text-fg-subtle sm:block" />
+              <input
+                value={componentName}
+                onChange={(event) => onComponentNameChange(event.target.value)}
+                onBlur={() =>
+                  onComponentNameChange(normalizeComponentName(componentName))
                 }
-                subtitle="You can also drag and drop an SVG anywhere on this page."
-                hint="Only .svg files are accepted."
-                isDragActive={isDragActive}
-                onOpen={open}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    event.currentTarget.blur();
+                  }
+                }}
+                spellCheck={false}
+                autoComplete="off"
+                aria-label="Component name"
+                placeholder="SvgComponent"
+                className="w-28 truncate rounded bg-transparent font-mono text-[12px] font-medium text-fg placeholder:text-fg-subtle focus-visible:bg-white/[0.04] sm:w-40"
+              />
+              <span className="font-mono text-[12px] text-fg-subtle">
+                .{fileType}
+              </span>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <FileTypeControl value={fileType} onChange={onFileTypeChange} />
+              <button
+                type="button"
+                onClick={onCopy}
+                className={clsx(
+                  "inline-flex h-8 items-center gap-1.5 rounded-lg px-3 text-[11.5px] font-medium transition-all active:scale-[0.98]",
+                  copied
+                    ? "bg-white/[0.08] text-fg"
+                    : "bg-accent text-ink-950 shadow-[0_0_24px_-8px_rgba(139,124,255,0.8)] hover:bg-accent-soft",
+                )}
+              >
+                {copied ? (
+                  <CheckIcon className="h-3.5 w-3.5" />
+                ) : (
+                  <CopyIcon className="h-3.5 w-3.5" />
+                )}
+                {copied ? "Copied" : "Copy"}
+              </button>
+            </div>
+          </div>
+
+          <div className="flex h-10 shrink-0 items-center justify-between border-b border-line px-3">
+            <div
+              className="flex h-full items-center gap-1"
+              role="tablist"
+              aria-label="Output view"
+            >
+              {TABS.map((tab) => (
+                <button
+                  key={tab.id}
+                  type="button"
+                  role="tab"
+                  id={`output-tab-${tab.id}`}
+                  aria-selected={view === tab.id}
+                  aria-controls="output-panel"
+                  onClick={() => onViewChange(tab.id)}
+                  className={clsx(
+                    "relative flex h-full items-center px-2 text-[11.5px] font-medium transition-colors",
+                    view === tab.id
+                      ? "text-fg"
+                      : "text-fg-subtle hover:text-fg-muted",
+                  )}
+                >
+                  {tab.label}
+                  {view === tab.id && (
+                    <motion.span
+                      layoutId="output-tab-underline"
+                      className="absolute inset-x-1.5 -bottom-px h-px bg-accent"
+                      transition={{
+                        type: "spring",
+                        stiffness: 520,
+                        damping: 40,
+                      }}
+                    />
+                  )}
+                </button>
+              ))}
+            </div>
+
+            <span className="font-mono text-[9.5px] tabular-nums text-fg-subtle">
+              {lineCount} {lineCount === 1 ? "line" : "lines"}
+            </span>
+          </div>
+
+          <div
+            id="output-panel"
+            role="tabpanel"
+            aria-labelledby={`output-tab-${view}`}
+            className="dark-scroll relative min-h-0 flex-1 overflow-auto bg-ink-950/60"
+          >
+            <div key={view}>
+              <CodeBlock
+                code={code}
+                language={view === "component" ? fileType : "xml"}
               />
             </div>
           </div>
-        )}
-
-        {error && (
-          <div className="bg-red-900/50 border-l-4 border-red-400 p-3 rounded-r-lg shrink-0">
-            <div className="flex">
-              <div className="shrink-0">
-                <svg
-                  className="h-5 w-5 text-red-400"
-                  viewBox="0 0 20 20"
-                  fill="currentColor"
-                >
-                  <path
-                    fillRule="evenodd"
-                    d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
-                    clipRule="evenodd"
-                  />
-                </svg>
-              </div>
-              <div className="ml-3">
-                <p className="text-sm text-red-200">{error}</p>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {svgContent && (
-          <div className="flex-1 flex flex-col gap-4 min-h-0 overflow-hidden">
-            <UploadZone
-              title={
-                isDragActive
-                  ? "Drop to replace current SVG"
-                  : "Replace current SVG"
-              }
-              subtitle="Click this area to choose another SVG file."
-              hint="You can also drag and drop an SVG anywhere on this page."
-              isDragActive={isDragActive}
-              onOpen={open}
-              className="shrink-0"
-            />
-            <div className="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6 min-h-0 overflow-hidden">
-              {/* 左侧面板 */}
-              <div className="flex flex-col space-y-4 min-h-0 overflow-hidden">
-                <div className="flex-1 flex flex-col space-y-4 min-h-0 overflow-hidden">
-                  <div className="bg-gray-800 rounded-xl shadow-xs p-4 shrink-0">
-                    <h2 className="text-lg font-semibold text-white mb-3">
-                      SVG Preview
-                    </h2>
-                    <SvgPreview svgContent={svgContent} />
-                  </div>
-
-                  <div className="bg-gray-800 rounded-xl shadow-xs p-4 flex-1 min-h-0 overflow-hidden">
-                    <h2 className="text-lg font-semibold text-white mb-3">
-                      SVG Source
-                    </h2>
-                    <div className="rounded-lg overflow-hidden bg-gray-900 h-[calc(100%-2rem)]">
-                      <CodeBlock code={svgContent} language="xml" />
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* 右侧面板 */}
-              {reactCode && (
-                <div className="bg-gray-800 rounded-xl shadow-xs p-4 flex flex-col min-h-0 overflow-hidden">
-                  <div className="flex flex-wrap justify-between items-center gap-4 mb-4 shrink-0">
-                    <h2 className="text-lg font-semibold text-white">
-                      React Component
-                    </h2>
-                    <div className="flex items-center space-x-4">
-                      <div className="flex items-center space-x-2">
-                        <label className="text-sm font-medium text-gray-300">
-                          File Type:
-                        </label>
-                        <select
-                          value={fileType}
-                          onChange={(e) =>
-                            setFileType(e.target.value as FileType)
-                          }
-                          onClick={(e) => e.stopPropagation()}
-                          className="block w-24 px-3 py-1.5 text-sm border-2 border-gray-600 rounded-lg bg-gray-700 text-gray-200 focus:outline-hidden focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200"
-                        >
-                          <option value="tsx">TSX</option>
-                          <option value="jsx">JSX</option>
-                        </select>
-                      </div>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          copyToClipboard();
-                        }}
-                        className="inline-flex items-center px-3 py-1.5 border border-transparent text-sm font-medium rounded-md shadow-xs text-white bg-blue-600 hover:bg-blue-700 focus:outline-hidden focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-200"
-                      >
-                        <svg
-                          className="h-4 w-4 mr-2"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                          stroke="currentColor"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"
-                          />
-                        </svg>
-                        Copy Code
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="mb-4 shrink-0">
-                    <label
-                      htmlFor="componentName"
-                      className="block text-sm font-medium text-gray-200 mb-2"
-                    >
-                      Component Name
-                    </label>
-                    <div className="relative rounded-md shadow-xs">
-                      <input
-                        type="text"
-                        id="componentName"
-                        value={componentName}
-                        onChange={handleComponentNameChange}
-                        onClick={(e) => e.stopPropagation()}
-                        className="block w-full px-3 py-1.5 text-sm border-2 border-gray-600 rounded-lg bg-gray-700 text-gray-200 focus:outline-hidden focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200"
-                        placeholder="Enter component name"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="mb-4 shrink-0">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div>
-                        <label
-                          htmlFor="previewColor"
-                          className="block text-sm font-medium text-gray-200 mb-2"
-                        >
-                          Color
-                        </label>
-                        <div className="flex items-center space-x-2">
-                          <input
-                            type="color"
-                            id="previewColor"
-                            value={previewColor}
-                            onChange={(e) => setPreviewColor(e.target.value)}
-                            onClick={(e) => e.stopPropagation()}
-                            className="h-8 w-8 rounded cursor-pointer"
-                          />
-                          <input
-                            type="text"
-                            value={previewColor}
-                            onChange={(e) => setPreviewColor(e.target.value)}
-                            onClick={(e) => e.stopPropagation()}
-                            className="block w-full px-3 py-1.5 text-sm border-2 border-gray-600 rounded-lg bg-gray-700 text-gray-200 focus:outline-hidden focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200"
-                          />
-                        </div>
-                      </div>
-                      <div>
-                        <label
-                          htmlFor="previewSize"
-                          className="block text-sm font-medium text-gray-200 mb-2"
-                        >
-                          Size (px)
-                        </label>
-                        <input
-                          type="number"
-                          id="previewSize"
-                          value={previewSize}
-                          onChange={(e) =>
-                            setPreviewSize(Number(e.target.value))
-                          }
-                          onClick={(e) => e.stopPropagation()}
-                          min="10"
-                          max="500"
-                          className="block w-full px-3 py-1.5 text-sm border-2 border-gray-600 rounded-lg bg-gray-700 text-gray-200 focus:outline-hidden focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200"
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="mb-4 shrink-0">
-                    <h3 className="text-sm font-medium text-gray-200 mb-2">
-                      Preview
-                    </h3>
-                    <div className="max-h-[200px] overflow-auto">
-                      <Preview
-                        svgContent={svgContent}
-                        color={previewColor}
-                        size={previewSize}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="rounded-lg overflow-hidden bg-gray-900 flex-1 min-h-0">
-                    <div className="h-full overflow-y-auto scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-gray-800 hover:scrollbar-thumb-gray-500">
-                      <CodeBlock code={reactCode} language={fileType} />
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
+        </section>
       </div>
+    </section>
+  );
+}
+
+function TintControl({
+  value,
+  onChange,
+}: {
+  value: string | null;
+  onChange: (value: string | null) => void;
+}) {
+  return (
+    <div className="flex h-8 items-center gap-1.5 rounded-md border border-line bg-white/[0.02] px-1.5 transition-colors focus-within:border-accent/40 focus-within:ring-2 focus-within:ring-accent/20">
+      <span
+        className="relative h-4 w-4 overflow-hidden rounded-[4px] ring-1 ring-white/20 ring-inset"
+        style={{ backgroundColor: value ?? "#111111" }}
+      >
+        <input
+          type="color"
+          value={value ?? "#111111"}
+          onChange={(event) => onChange(event.target.value)}
+          aria-label="Preview tint"
+          className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+        />
+      </span>
+      <span className="w-9 font-mono text-[9.5px] tracking-wide text-fg-muted uppercase">
+        {value ? value.replace("#", "") : "ORIG"}
+      </span>
+      {value && (
+        <button
+          type="button"
+          onClick={() => onChange(null)}
+          aria-label="Reset tint"
+          title="Reset tint"
+          className="rounded p-0.5 text-fg-subtle transition-colors hover:bg-white/[0.06] hover:text-fg"
+        >
+          <XIcon className="h-2.5 w-2.5" />
+        </button>
+      )}
+    </div>
+  );
+}
+
+function SizeControl({
+  value,
+  onChange,
+}: {
+  value: number;
+  onChange: (value: number) => void;
+}) {
+  const [draft, setDraft] = useState<string | null>(null);
+  const display = draft ?? String(value);
+
+  const commit = () => {
+    const parsed = Number.parseInt(display, 10);
+    const next = clampSize(Number.isFinite(parsed) ? parsed : value);
+    setDraft(null);
+    onChange(next);
+  };
+
+  const step = (delta: number) => {
+    setDraft(null);
+    onChange(clampSize(value + delta));
+  };
+
+  return (
+    <div className="flex h-8 items-center rounded-md border border-line bg-white/[0.02] transition-colors focus-within:border-accent/40 focus-within:ring-2 focus-within:ring-accent/20">
+      <button
+        type="button"
+        onClick={() => step(-8)}
+        aria-label="Decrease preview size"
+        className="flex h-full w-6 items-center justify-center rounded-l-md text-fg-subtle transition-colors hover:bg-white/[0.05] hover:text-fg"
+      >
+        <MinusIcon className="h-3 w-3" />
+      </button>
+
+      <input
+        type="number"
+        value={display}
+        min={MIN_SIZE}
+        max={MAX_SIZE}
+        onChange={(event) => {
+          setDraft(event.target.value);
+          const parsed = Number.parseInt(event.target.value, 10);
+
+          if (
+            Number.isFinite(parsed) &&
+            parsed >= MIN_SIZE &&
+            parsed <= MAX_SIZE
+          ) {
+            onChange(parsed);
+          }
+        }}
+        onBlur={commit}
+        onKeyDown={(event) => {
+          if (event.key === "Enter") {
+            event.currentTarget.blur();
+          }
+        }}
+        aria-label="Preview size in pixels"
+        className="w-8 appearance-none bg-transparent text-center font-mono text-[10px] tabular-nums text-fg outline-none [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+      />
+
+      <span className="pr-1 text-[8.5px] text-fg-subtle">px</span>
+
+      <button
+        type="button"
+        onClick={() => step(8)}
+        aria-label="Increase preview size"
+        className="flex h-full w-6 items-center justify-center rounded-r-md text-fg-subtle transition-colors hover:bg-white/[0.05] hover:text-fg"
+      >
+        <PlusIcon className="h-3 w-3" />
+      </button>
+    </div>
+  );
+}
+
+function FileTypeControl({
+  value,
+  onChange,
+}: {
+  value: FileType;
+  onChange: (value: FileType) => void;
+}) {
+  return (
+    <div
+      className="flex h-8 items-center rounded-md border border-line bg-white/[0.02] p-0.5"
+      role="group"
+      aria-label="Output file type"
+    >
+      {(["tsx", "jsx"] as const).map((option) => (
+        <button
+          key={option}
+          type="button"
+          onClick={() => onChange(option)}
+          aria-pressed={value === option}
+          className={clsx(
+            "relative flex h-full items-center rounded-[5px] px-2 font-mono text-[9.5px] uppercase tracking-wide transition-colors",
+            value === option ? "text-fg" : "text-fg-subtle hover:text-fg-muted",
+          )}
+        >
+          {value === option && (
+            <motion.span
+              layoutId="file-type-pill"
+              className="absolute inset-0 rounded-[5px] bg-white/[0.08] shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]"
+              transition={{ type: "spring", stiffness: 520, damping: 38 }}
+            />
+          )}
+          <span className="relative z-10">{option}</span>
+        </button>
+      ))}
     </div>
   );
 }

@@ -47,9 +47,13 @@ export default defineConfig(({ mode }) => {
           ],
         },
         manifest: {
-          name: packageJSON.name,
-          short_name: packageJSON.name,
-          theme_color: "#ffffff",
+          name: "SVG2React",
+          short_name: "SVG2React",
+          description:
+            "Convert SVG files into clean, typed React components — entirely in your browser.",
+          theme_color: "#08080a",
+          background_color: "#08080a",
+          display: "standalone",
           icons: [
             {
               src: "pwa-192x192.png",
