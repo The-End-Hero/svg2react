@@ -23,14 +23,14 @@
     "dayjs": "^1.11.23",
     "lodash-es": "^4.18.1",
     "motion": "^14.14.0",
-    "posthog-js": "^1.450.1",
+    "posthog-js": "^1.453.2",
     "prism-react-renderer": "^2.4.1",
     "react": "^19.3.1",
     "react-device-detect": "^2.2.3",
     "react-dom": "^19.3.1",
-    "react-dropzone": "^20.2.0",
+    "react-dropzone": "^20.2.1",
     "react-hot-toast": "^2.6.1",
-    "react-router": "^8.5.1",
+    "react-router": "^8.5.2",
     "zustand": "^5.1.0"
   },
   "devDependencies": {
